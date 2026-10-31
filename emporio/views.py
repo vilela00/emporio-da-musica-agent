@@ -252,6 +252,7 @@ def handoff_text(ticket: Ticket, status: StoreStatus) -> str:
     sla = (
         "Retorno da equipe em até 24 horas úteis (manual §7.3)."
         if ticket.reason == "reclamacao"
-        else "A equipe dá retorno no horário de atendimento."
+        else "O manual não define prazo para este tipo de pedido: a equipe responde por este WhatsApp "
+        "no horário de atendimento. Não prometa dia nem hora."
     )
     return f"Encaminhamento registrado: protocolo {ticket.protocol} ({REASONS[ticket.reason]}). {sla} {describe(status)}"
