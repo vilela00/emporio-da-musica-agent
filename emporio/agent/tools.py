@@ -11,6 +11,7 @@ from typing import Literal
 from langchain.tools import ToolRuntime, tool
 
 from emporio import clock
+from emporio.agent.prompts import Session
 from emporio.catalog import ROOT, get_store
 from emporio.handoff import open_ticket
 from emporio.hours import store_status
@@ -97,7 +98,7 @@ def get_product_details(product_id: int) -> str:
 
 @tool
 def quote(
-    runtime: ToolRuntime,
+    runtime: ToolRuntime[Session],
     product_ids: list[int] | None = None,
     amount: float | None = None,
     installments: int | None = None,
@@ -134,7 +135,7 @@ def quote(
 
 
 @tool
-def get_my_orders(runtime: ToolRuntime, order_id: int | None = None, email: str = "") -> str:
+def get_my_orders(runtime: ToolRuntime[Session], order_id: int | None = None, email: str = "") -> str:
     """Orders of the customer on this WhatsApp number: status, items, total, tracking, delays and the
     return, exchange and warranty deadlines already computed.
 
@@ -164,7 +165,7 @@ def get_store_policy(topic: PolicyTopic) -> str:
 
 
 @tool
-def create_handoff(runtime: ToolRuntime, reason: HandoffReason, summary: str) -> str:
+def create_handoff(runtime: ToolRuntime[Session], reason: HandoffReason, summary: str) -> str:
     """Open a ticket for the human team and get a protocol number to give the customer.
 
     Use for complaints, return/exchange/warranty requests, data deletion requests, instruments that are
