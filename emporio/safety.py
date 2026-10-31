@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+import re
+
+# WhatsApp delivers text messages of up to 4,096 characters, so the API accepts that much; no
+# customer question needs more than 2,000. Longer messages get a fixed reply without a model call.
+API_MAX_CHARS = 4096
+MAX_MESSAGE_CHARS = 2000
+
 # Tool rounds the model may take for one customer message before the agent stops asking it.
 # The busiest scenario uses three. LangGraph 1.2 defaults to a recursion limit of 10,007 steps, so a
 # model stuck calling tools would keep calling, and billing, the API for a long time.
@@ -9,10 +16,27 @@ MAX_TOOL_ROUNDS = 6
 # Graph steps per message: six rounds of agent + tools, the answer, the guard and one retry fit in 20.
 RECURSION_LIMIT = 30
 
+TOO_LONG = (
+    "Sua mensagem ficou longa demais pra eu ler de uma vez. Me manda só o que você precisa, "
+    "em uma mensagem mais curta?"
+)
+UNREADABLE = "Não consegui ler a sua mensagem. Pode escrever de novo?"
 STUCK = (
     "Não consegui fechar essa consulta por aqui. Me diz de novo, em poucas palavras, o que você "
     "precisa? Se preferir, passo o seu caso para a equipe."
 )
+
+
+# Characters that render as nothing but still reach the model: zero-width and bidi controls, and the
+# Unicode tag block, which can hide a whole instruction inside an innocent-looking message.
+# U+200D (zero-width joiner) stays: emoji sequences need it.
+_INVISIBLE = re.compile(r"[\u200b\u200c\u2060\ufeff\u202a-\u202e\u2066-\u2069\U000e0000-\U000e007f]")
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def clean_message(text: str) -> str:
+    """The customer's text without invisible and control characters; newlines and tabs stay."""
+    return _CONTROL.sub("", _INVISIBLE.sub("", text)).strip()
 
 
 def tool_rounds(messages) -> int:

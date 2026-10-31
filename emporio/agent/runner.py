@@ -12,7 +12,7 @@ from emporio.agent.graph import build_graph, text_of
 from emporio.agent.prompts import Session
 from emporio.agent.whatsapp import whatsapp_text
 from emporio.catalog import ROOT, phone_digits
-from emporio.safety import RECURSION_LIMIT
+from emporio.safety import MAX_MESSAGE_CHARS, RECURSION_LIMIT, TOO_LONG, UNREADABLE, clean_message
 
 
 def model_failure(error: Exception) -> str:
@@ -53,6 +53,11 @@ class Agent:
         return f"{base}-{uuid.uuid4().hex[:8]}" if fresh or base == "anon" else base
 
     def reply(self, thread_id: str, phone: str | None, text: str) -> Turn:
+        text = clean_message(text)
+        if not text:
+            return Turn(text=UNREADABLE)
+        if len(text) > MAX_MESSAGE_CHARS:  # answered without calling the model
+            return Turn(text=TOO_LONG)
         state = self.graph.invoke(
             {"messages": [HumanMessage(content=text)]},
             config={"configurable": {"thread_id": thread_id}, "recursion_limit": RECURSION_LIMIT},

@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
+from emporio.safety import API_MAX_CHARS
+
 load_dotenv()
 
 app = FastAPI(title="Empório da Música - Tom", version="0.1.0")
@@ -20,8 +22,13 @@ app = FastAPI(title="Empório da Música - Tom", version="0.1.0")
 class IncomingMessage(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    sender: str = Field(alias="from", description="Customer's WhatsApp number, as the channel delivers it")
-    text: str
+    sender: str = Field(
+        alias="from",
+        min_length=1,
+        max_length=32,
+        description="Customer's WhatsApp number, as the channel delivers it",
+    )
+    text: str = Field(min_length=1, max_length=API_MAX_CHARS)
 
 
 class OutgoingMessage(BaseModel):
