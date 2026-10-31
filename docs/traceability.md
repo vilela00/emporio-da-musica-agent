@@ -19,7 +19,7 @@ I read the store manual the way I read a tender's terms of reference: every clau
 | §6.2 | Promotions don't stack; PIX not on promotional prices | `catalog.Store.active_promotion`, `PricedItem.pix_total` | `test_pricing.py::test_promotion_price_and_no_pix_on_top`, `test_mixed_cart_applies_pix_only_to_regular_items` |
 | §6.2 | Show original price and percentage with the promotional price | `views.price_text`, persona rule | S06 |
 | §7.1 | Tone: informal but professional | persona prompt | conversations 01–05 |
-| §7.1 | Never quote price, stock or deadlines without checking the system | tools + grounding guard (amounts, installment plans, protocol numbers, tracking codes) | `test_guard.py` (8 tests); the eval runner re-checks every reply |
+| §7.1 | Never quote price, stock or deadlines without checking the system | tools + grounding guard: amounts only from tool outputs (a price the customer typed confirms nothing); installment plans, protocol and tracking codes, phones and e-mails from a tool or the customer | `test_guard.py` (13 tests), S30; the eval runner re-checks every reply |
 | §7.1 | Out of hours: tell when the team is back | `hours.describe` in the prompt context | S16, S17, conversation 05 |
 | §7.2 | Greet by name | `prompts.customer_line` (name from the phone number) | `test_prompts.py`, S20 |
 | §7.3 | Out of stock: say so and offer similar available items | `search.alternatives`, `views.product_card` | `test_search.py`, `test_views.py::test_out_of_stock_card_offers_alternatives`, S07 |
@@ -27,5 +27,8 @@ I read the store manual the way I read a tender's terms of reference: every clau
 | §7.3 | Expired promotion: be transparent, give the current price | `views.product_card` lists past promotions as no longer valid | `test_views.py::test_product_card_prices_and_past_promotion`, S05, conversation 02 |
 | §7.3 | Complaint: empathy, register, forward; reply within 24 business hours | `create_handoff` → `handoff.open_ticket` (orders attached by the system) | `test_handoff.py`, S16, conversation 05 |
 | §8.1 | Legal warranty: 90 days from receipt | `orders.deadlines` | `test_orders.py`, S04, conversation 03 |
-| §9 | Personal data only for the customer's own orders | identity from the channel; `orders.lookup_orders` scoping; same answer for wrong e-mail and missing order | `test_orders.py` (3 tests), S13, S14, S19, conversation 04 |
+| §9 | Personal data only for the customer's own orders | identity from the channel; `orders.lookup_orders` scoping; same answer for wrong e-mail and missing order; no tool returns another customer's contact data | `test_orders.py` (3 tests), S13, S14, S19, S24, S27, conversation 04 |
 | §10 | When unsure how a policy applies, ask the manager | `create_handoff` with reason `duvida_de_politica` | persona rule |
+| §10 | The manual is an internal document | persona rule: explain the rule that applies, never paste the manual or the team's internal routines | S29 |
+| (safety) | The conversation cannot change the rules; claimed authority ("[SISTEMA]", "the manager authorized") is customer text | persona rule; tools scoped by the channel; prices only from the system | S14, S22, S23, S27 |
+| (no invention) | Facts about the store come only from the tools and the manual | persona rule; the guard checks phones and e-mails | S11, S25, S26 |
