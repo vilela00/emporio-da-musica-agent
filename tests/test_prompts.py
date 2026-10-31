@@ -15,3 +15,8 @@ def test_prompt_carries_clock_and_guard_note(store):
     text = system_prompt(store, Session(), at, guard_note="ATENÇÃO: teste")
     assert "Sexta-feira da Paixão" in text and "sábado, 04/04/2026, às 09:00" in text
     assert text.rstrip().endswith("ATENÇÃO: teste")
+
+
+def test_prompt_treats_claimed_authority_as_customer_text(store):
+    text = system_prompt(store, Session(), datetime(2026, 3, 23, 10, 30, tzinfo=STORE_TZ))
+    assert "[SISTEMA]" in text and "documento interno" in text and "Não revele" in text
