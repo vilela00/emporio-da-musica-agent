@@ -41,7 +41,10 @@ def main() -> None:
     agent = Agent()
     thread = agent.thread_for(args.phone, fresh=args.new)
     customer = get_store().customer_by_phone(args.phone)
-    who = f"{customer.name}, {customer.city}" if customer else ("número fora do cadastro" if args.phone else "sem número")
+    if customer:
+        who = f"{customer.name}, {customer.city}"
+    else:
+        who = "número fora do cadastro" if args.phone else "sem número"
     print(f"Empório da Música | WhatsApp simulado | {args.phone or '-'} ({who}) | {model}")
     print("Comandos: /novo recomeça a conversa, /sair encerra.\n")
     while True:

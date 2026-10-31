@@ -82,7 +82,8 @@ SCRIPTS = [
         5, "complaint-on-a-holiday", "A late order on Good Friday night",
         "Ana, customer #2, order #8 shipped and late", "+55 67 99654-7821",
         "2026-04-03T19:40", "Good Friday 03/04/2026, 19:40 (holiday, store closed)",
-        "a late shipment found in the data, the complaint registered with a protocol (§7.3) and the next opening after a holiday",
+        "a late shipment found in the data, the complaint registered with a protocol (§7.3) "
+        "and the next opening after a holiday",
         (
             "Boa noite. Meu pedido não chegou até hoje e já passou muito da data.",
             "Vocês abrem amanhã? Qual o endereço da loja?",

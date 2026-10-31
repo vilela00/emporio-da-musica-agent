@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from emporio.clock import STORE_TZ
 from emporio.hours import describe, easter, holidays, store_status
@@ -47,5 +47,5 @@ def test_saturday_closes_at_one():
 
 def test_campo_grande_is_one_hour_behind_brasilia():
     # 13:00 UTC is 10:00 in Brasília but 09:00 in Campo Grande: the store has just opened.
-    status = store_status(datetime(2026, 3, 23, 13, 0, tzinfo=timezone.utc))
+    status = store_status(datetime(2026, 3, 23, 13, 0, tzinfo=UTC))
     assert status.is_open and status.at.hour == 9

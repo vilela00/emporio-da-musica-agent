@@ -41,8 +41,13 @@ def findings(store: Store) -> list[Finding]:
     add(
         "A-01",
         "Product name and description mention different brands",
-        [f"#{p.id} '{p.name}' is described as: \"{p.description[:70]}...\"" for p in products.values() if p.description_conflict],
-        "Name, price, stock, status and specs are trusted. The description is hidden from the model for these products.",
+        [
+            f"#{p.id} '{p.name}' is described as: \"{p.description[:70]}...\""
+            for p in products.values()
+            if p.description_conflict
+        ],
+        "Name, price, stock, status and specs are trusted. "
+        "The description is hidden from the model for these products.",
     )
     sold = defaultdict(list)
     for order in orders.values():
@@ -58,8 +63,13 @@ def findings(store: Store) -> list[Finding]:
     add(
         "A-03",
         "Discontinued product still has stock",
-        [f"#{p.id} '{p.name}': discontinued with {p.stock} units" for p in products.values() if p.status == "discontinued" and p.stock > 0],
-        "Treated as out of the catalog (manual §7.3), with equivalents offered. Leftover stock is flagged to the team here.",
+        [
+            f"#{p.id} '{p.name}': discontinued with {p.stock} units"
+            for p in products.values()
+            if p.status == "discontinued" and p.stock > 0
+        ],
+        "Treated as out of the catalog (manual §7.3), with equivalents offered. "
+        "Leftover stock is flagged to the team here.",
     )
     add(
         "A-04",
@@ -104,12 +114,16 @@ def findings(store: Store) -> list[Finding]:
     ]
     namesakes = sum(1 for group in by_first.values() if len(group) > 1)
     if evidence:
-        evidence.append(f"{namesakes} first names are shared by two or three customers (e.g. three Brunos, three Thiagos, three Camilas)")
+        evidence.append(
+            f"{namesakes} first names are shared by two or three customers "
+            "(e.g. three Brunos, three Thiagos, three Camilas)"
+        )
     add(
         "A-08",
         "Customer records that a name lookup would mix up",
         evidence,
-        "Customers are identified by the WhatsApp number, never by name. E-mail is only a second check, together with the order number.",
+        "Customers are identified by the WhatsApp number, never by name. "
+        "E-mail is only a second check, together with the order number.",
     )
     used = {p.category_id for p in products.values()}
     add(
@@ -117,7 +131,8 @@ def findings(store: Store) -> list[Finding]:
         "Categories with no products (the manual promises '300+ instruments'; the data has "
         f"{len(products)})",
         [f"#{c.id} {c.name}" for c in store.categories.values() if c.id not in used],
-        "The agent says it found nothing in the system right now and offers to check with the team. It never says the store does not sell it.",
+        "The agent says it found nothing in the system right now and offers to check with the team. "
+        "It never says the store does not sell it.",
     )
     by_product = defaultdict(list)
     for promo in store.promotions:
@@ -129,8 +144,11 @@ def findings(store: Store) -> list[Finding]:
     for promo in store.promotions:
         low, high = CAMPAIGN_RANGES.get(promo.label, (0, 100))
         if not low <= promo.percent <= high:
-            promo_evidence.append(f"promotion #{promo.id} '{promo.label}' gives {promo.percent}%, outside the manual's {low}-{high}%")
-    promo_evidence.append(f"only {sum(p.active for p in store.promotions)} of {len(store.promotions)} promotions are active, and none has dates")
+            promo_evidence.append(
+                f"promotion #{promo.id} '{promo.label}' gives {promo.percent}%, outside the manual's {low}-{high}%"
+            )
+    active = sum(p.active for p in store.promotions)
+    promo_evidence.append(f"only {active} of {len(store.promotions)} promotions are active, and none has dates")
     add(
         "A-13",
         "Promotions: no dates, duplicates per product, campaigns outside the manual's ranges",
@@ -144,15 +162,21 @@ def findings(store: Store) -> list[Finding]:
         "A-15",
         "Specs change shape by category and 'strings' has two meanings",
         [f"{name}: {' / '.join(sorted(keys))}" for name, keys in schemas.items()]
-        + ["'strings' is the material (nylon/steel) on Violões and Ukuleles, and the count ('4', '6') on Guitarras and Baixos"],
+        + [
+            "'strings' is the material (nylon/steel) on Violões and Ukuleles, "
+            "and the count ('4', '6') on Guitarras and Baixos"
+        ],
         "Specs are rendered with category-aware labels in Portuguese.",
     )
     last_day = max(o.placed_on for o in orders.values())
     add(
         "A-16",
         f"Shipped order past its estimated delivery (dataset ends on {last_day.isoformat()})",
-        [f"order #{o.id}: shipped, estimated {o.estimated_delivery.isoformat()}"
-         for o in orders.values() if o.status == "shipped" and o.estimated_delivery and o.estimated_delivery < last_day],
+        [
+            f"order #{o.id}: shipped, estimated {o.estimated_delivery.isoformat()}"
+            for o in orders.values()
+            if o.status == "shipped" and o.estimated_delivery and o.estimated_delivery < last_day
+        ],
         "The order tool flags the delay; the agent offers the tracking code and a handoff.",
     )
     add(

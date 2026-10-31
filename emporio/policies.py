@@ -66,7 +66,7 @@ NOTES: dict[str, tuple[str, ...]] = {
 def sections() -> dict[str, str]:
     text = re.sub(r"<!--.*?-->", "", MANUAL.read_text(encoding="utf-8"), flags=re.S)
     parts = re.split(r"(?m)^## (\d+)\. ", text)
-    return {number: f"## {number}. {body.strip()}" for number, body in zip(parts[1::2], parts[2::2])}
+    return {number: f"## {number}. {body.strip()}" for number, body in zip(parts[1::2], parts[2::2], strict=True)}
 
 
 def get_policy(topic: str) -> str:
@@ -75,4 +75,5 @@ def get_policy(topic: str) -> str:
     numbers = TOPICS[topic]
     body = "\n\n".join(sections()[n] for n in numbers)
     notes = "\n".join(f"- {note}" for note in NOTES.get(topic, ()))
-    return f"Manual de políticas da loja (versão 2.1), seção {' e '.join(numbers)}:\n\n{body}\n\nNotas de interpretação:\n{notes}"
+    header = f"Manual de políticas da loja (versão 2.1), seção {' e '.join(numbers)}:"
+    return f"{header}\n\n{body}\n\nNotas de interpretação:\n{notes}"

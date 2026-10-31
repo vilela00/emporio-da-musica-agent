@@ -72,7 +72,7 @@ def main() -> None:
             f"| {s.id} | {s.title} | {s.covers} | {', '.join(dict.fromkeys(called)) or '-'} "
             f"| {', '.join(models) or '-'} | {status} |"
         )
-        conversation = "\n\n".join(f"**Customer:** {m}\n\n**Tom:** {r}" for m, r in zip(s.turns, replies))
+        conversation = "\n\n".join(f"**Customer:** {m}\n\n**Tom:** {r}" for m, r in zip(s.turns, replies, strict=False))
         notes = "".join(f"\n- {f}" for f in failures)
         details.append(f"### {s.id} {s.title} ({status}, {seconds:.1f}s)\n{notes}\n\n{conversation}\n")
     passed = sum(row.endswith("| pass |") for row in rows)

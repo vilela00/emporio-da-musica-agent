@@ -178,9 +178,13 @@ def quote_text(quote: Quote, shipping: Shipping, city: str | None, installments:
                 f"mínimo de {brl(min_installment(installments))} para essa faixa (manual §3.1)."
             )
     if quote.combined_payment_allowed:
-        lines.append(f"Pagamento combinado (ex.: PIX + cartão): permitido, a compra passa de {brl(COMBINED_PAYMENT_ABOVE)}.")
+        lines.append(
+            f"Pagamento combinado (ex.: PIX + cartão): permitido, a compra passa de {brl(COMBINED_PAYMENT_ABOVE)}."
+        )
     else:
-        lines.append(f"Pagamento combinado (ex.: PIX + cartão): só para compras acima de {brl(COMBINED_PAYMENT_ABOVE)}.")
+        lines.append(
+            f"Pagamento combinado (ex.: PIX + cartão): só para compras acima de {brl(COMBINED_PAYMENT_ABOVE)}."
+        )
     lines.append(shipping_text(shipping, city))
     return "\n".join(lines)
 
@@ -189,7 +193,11 @@ def shipping_text(shipping: Shipping, city: str | None) -> str:
     if shipping.region == "unknown":
         return "Frete: falta a cidade de entrega para eu informar as condições."
     if shipping.region == "metro":
-        fee = "grátis (pedido a partir de R$ 500,00)" if shipping.fee == 0 else f"{brl(shipping.fee)} (pedido abaixo de R$ 500,00)"
+        fee = (
+            "grátis (pedido a partir de R$ 500,00)"
+            if shipping.fee == 0
+            else f"{brl(shipping.fee)} (pedido abaixo de R$ 500,00)"
+        )
         return (
             f"Frete para Campo Grande: {fee}; entrega em 1 a 3 dias úteis por motoboy próprio, "
             "com ligação antes da entrega."
@@ -261,4 +269,5 @@ def handoff_text(ticket: Ticket, status: StoreStatus) -> str:
         else "O manual não define prazo para este tipo de pedido: a equipe responde por este WhatsApp "
         "no horário de atendimento. Não prometa dia nem hora."
     )
-    return f"Encaminhamento registrado: protocolo {ticket.protocol} ({REASONS[ticket.reason]}). {sla} {describe(status)}"
+    reason = REASONS[ticket.reason]
+    return f"Encaminhamento registrado: protocolo {ticket.protocol} ({reason}). {sla} {describe(status)}"
