@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import unicodedata
 
 # WhatsApp delivers text messages of up to 4,096 characters, so the API accepts that much; no
 # customer question needs more than 2,000. Longer messages get a fixed reply without a model call.
@@ -13,10 +14,12 @@ API_MAX_CHARS = 4096
 MAX_MESSAGE_CHARS = 2000
 
 # Tool rounds the model may take for one customer message before the agent stops asking it.
-# The busiest scenario uses three. LangGraph 1.2 defaults to a recursion limit of 10,007 steps, so a
-# model stuck calling tools would keep calling, and billing, the API for a long time.
+# The busiest scenario uses three. LangGraph 1.2 defaults to a recursion limit of 10,007 steps
+# (DEFAULT_RECURSION_LIMIT in langgraph/_internal/_config.py), so a model stuck calling tools would
+# keep calling, and billing, the API for a long time.
 MAX_TOOL_ROUNDS = 6
-# Graph steps per message: six rounds of agent + tools, the answer, the guard and one retry fit in 20.
+# Graph steps per message. The worst case is 17: tool rounds (two steps each) split around a guard
+# retry, the stop reply and the guard. 30 leaves room without letting a loop run.
 RECURSION_LIMIT = 30
 
 # Tool arguments come from the model, so they are checked like user input.
@@ -35,16 +38,22 @@ STUCK = (
 )
 
 
-# Characters that render as nothing but still reach the model: zero-width and bidi controls, and the
-# Unicode tag block, which can hide a whole instruction inside an innocent-looking message.
-# U+200D (zero-width joiner) stays: emoji sequences need it.
-_INVISIBLE = re.compile(r"[\u200b\u200c\u2060\ufeff\u202a-\u202e\u2066-\u2069\U000e0000-\U000e007f]")
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+ZERO_WIDTH_JOINER = "\u200d"
+
+
+def invisible(char: str) -> bool:
+    """Characters that render as nothing but still reach the model: format characters (zero-width, bidi
+    controls, soft hyphen, the Unicode tag block) and the variation selectors supplement. Both can carry
+    a whole instruction inside an innocent-looking message. The zero-width joiner stays: emoji need it."""
+    if char == ZERO_WIDTH_JOINER:
+        return False
+    return unicodedata.category(char) == "Cf" or "\U000e0100" <= char <= "\U000e01ef"
 
 
 def clean_message(text: str) -> str:
     """The customer's text without invisible and control characters; newlines and tabs stay."""
-    return _CONTROL.sub("", _INVISIBLE.sub("", text)).strip()
+    return _CONTROL.sub("", "".join(c for c in text if not invisible(c))).strip()
 
 
 def quote_problem(product_ids: list[int] | None, amount: float | None) -> str | None:
