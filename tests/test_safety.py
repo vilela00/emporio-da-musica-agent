@@ -1,3 +1,5 @@
+import io
+import logging
 from types import SimpleNamespace
 
 from emporio.safety import (
@@ -5,10 +7,14 @@ from emporio.safety import (
     MAX_MESSAGE_CHARS,
     MAX_TOOL_ROUNDS,
     RECURSION_LIMIT,
+    RedactingFilter,
     clean_message,
     quote_problem,
+    redact,
     tool_rounds,
 )
+
+FAKE_KEY = "AIza" + "Sy" + "x" * 33  # assembled at runtime so the repository scan never matches it
 
 
 def message(kind: str, tool_calls=None):
@@ -52,3 +58,31 @@ def test_quote_arguments_are_checked_like_user_input():
     assert "até 20 unidades" in quote_problem([95] * 21, None)
     for amount in (0, -50, float("nan"), 10**9):
         assert "Valor inválido" in quote_problem(None, amount)
+
+
+def test_google_keys_are_masked_anywhere():
+    text = f"403 for https://example.test/v1/models?key={FAKE_KEY}&alt=json (key {FAKE_KEY})"
+    masked = redact(text)
+    assert FAKE_KEY not in masked and "?key=[redacted]&alt=json" in masked
+
+
+def test_values_of_secret_variables_are_masked(monkeypatch):
+    monkeypatch.setenv("EMPORIO_API_TOKEN", "s3cr3t-token-123")
+    assert redact("Bearer s3cr3t-token-123 refused") == "Bearer [EMPORIO_API_TOKEN redacted] refused"
+
+
+def test_log_lines_and_tracebacks_are_masked():
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.addFilter(RedactingFilter())
+    logger = logging.getLogger("tests.redaction")
+    logger.addHandler(handler)
+    logger.propagate = False
+    try:
+        raise RuntimeError(f"rejected {FAKE_KEY}")
+    except RuntimeError:
+        logger.exception("call failed with %s", FAKE_KEY)
+    finally:
+        logger.removeHandler(handler)
+    output = stream.getvalue()
+    assert FAKE_KEY not in output and output.count("[redacted]") == 2 and "RuntimeError" in output

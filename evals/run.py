@@ -15,6 +15,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from emporio.agent.guard import ungrounded
+from emporio.safety import redact
 from evals.scenarios import SCENARIOS, Scenario
 
 REPORT = Path(__file__).parent / "report.md"
@@ -62,7 +63,7 @@ def main() -> None:
                 leaks += ungrounded(turn.text, outputs, said)  # the guard should have stopped these
             failures = check(s, replies, called) + [f"not grounded: {x}" for x in leaks]
         except Exception as error:  # a crash is a failed scenario, not a crashed run
-            failures = [f"error: {type(error).__name__}: {str(error)[:300]}"]
+            failures = [f"error: {type(error).__name__}: {redact(str(error))[:300]}"]
             quota_errors += "RESOURCE_EXHAUSTED" in str(error) or "402" in str(error)
         seconds = time.perf_counter() - started
         status = "pass" if not failures else "FAIL"

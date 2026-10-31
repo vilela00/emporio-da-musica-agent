@@ -1,7 +1,10 @@
-"""Limits that keep a hostile or broken conversation cheap. Each number has its reason next to it."""
+"""Limits that keep a hostile or broken conversation cheap, and redaction that keeps secrets out of
+anything the app prints or writes. Each number has its reason next to it."""
 
 from __future__ import annotations
 
+import logging
+import os
 import re
 
 # WhatsApp delivers text messages of up to 4,096 characters, so the API accepts that much; no
@@ -62,3 +65,41 @@ def tool_rounds(messages) -> int:
         if message.type == "ai" and getattr(message, "tool_calls", None):
             rounds += 1
     return rounds
+
+
+# The Google SDK reads the key from the environment and sends it in a header (x-goog-api-key), never in
+# the URL, and no code here reads it. redact() is the second line of defense: every error text the app
+# prints, logs or writes to a file goes through it.
+SECRET_VARS = ("GOOGLE_API_KEY", "GEMINI_API_KEY", "EMPORIO_API_TOKEN")
+_GOOGLE_KEY = re.compile(r"AIza[0-9A-Za-z_\-]{35}")
+_KEY_PARAM = re.compile(r"(?i)([?&](?:key|api_key|access_token)=)[^&\s\"']+")
+
+
+def redact(text: str) -> str:
+    """Mask API keys and the values of the secret environment variables."""
+    text = _KEY_PARAM.sub(r"\1[redacted]", _GOOGLE_KEY.sub("[redacted]", text))
+    for name in SECRET_VARS:
+        value = (os.getenv(name) or "").strip()
+        if len(value) >= 8:
+            text = text.replace(value, f"[{name} redacted]")
+    return text
+
+
+class RedactingFilter(logging.Filter):
+    """Runs every record a handler prints, traceback included, through redact()."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.msg, record.args = redact(record.getMessage()), None
+        if record.exc_info and not record.exc_text:
+            record.exc_text = logging.Formatter().formatException(record.exc_info)
+        if record.exc_text:
+            record.exc_text = redact(record.exc_text)
+        return True
+
+
+def protect_logs(*names: str) -> None:
+    """Add the filter to the handlers of these loggers (the root logger when no name is given)."""
+    for name in names or ("",):
+        for handler in logging.getLogger(name or None).handlers:
+            if not any(isinstance(f, RedactingFilter) for f in handler.filters):
+                handler.addFilter(RedactingFilter())

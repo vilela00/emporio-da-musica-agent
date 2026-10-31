@@ -10,6 +10,8 @@ import sys
 
 from dotenv import load_dotenv
 
+from emporio.safety import protect_logs, redact
+
 
 def _short(args: dict) -> str:
     return ", ".join(f"{k}={v!r}" for k, v in args.items())
@@ -31,6 +33,7 @@ def main() -> None:
     if args.trace:
         logging.basicConfig(level=logging.INFO, format="  [%(name)s] %(message)s")
         logging.getLogger("httpx").setLevel(logging.WARNING)
+        protect_logs()
 
     from emporio.agent.runner import Agent, model_failure  # imported after .env is loaded
     from emporio.catalog import get_store
@@ -60,7 +63,7 @@ def main() -> None:
         except Exception as error:  # every model in the chain failed
             print(f"\n[sem resposta: {model_failure(error)}. Tente de novo mais tarde ou troque LLM_MODEL no .env]\n")
             if args.trace:
-                print(f"  [{type(error).__name__}] {str(error)[:300]}")
+                print(f"  [{type(error).__name__}] {redact(str(error))[:300]}")
             continue
         if args.trace:
             for name, call_args in turn.tool_calls:
