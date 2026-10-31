@@ -14,7 +14,7 @@ from langgraph.prebuilt import ToolNode
 from langgraph.runtime import Runtime
 
 from emporio import clock
-from emporio.agent.guard import FALLBACK, retry_note, ungrounded_amounts
+from emporio.agent.guard import FALLBACK, retry_note, ungrounded
 from emporio.agent.prompts import Session, system_prompt
 from emporio.agent.tools import TOOLS
 from emporio.catalog import get_store
@@ -76,17 +76,17 @@ def build_graph(checkpointer=None, llm=None):
     def guard(state: State) -> dict:
         last = state["messages"][-1]
         evidence = [text_of(m) for m in state["messages"][:-1] if m.type in ("human", "tool")]
-        missing = ungrounded_amounts(text_of(last), evidence)
-        if not missing:
+        issues = ungrounded(text_of(last), evidence)
+        if not issues:
             return {"guard_note": None, "guard_retries": 0}
         if state.get("guard_retries", 0) < 1:
-            log.info("ungrounded amounts %s: sending the answer back once", sorted(missing))
+            log.info("not grounded %s: sending the answer back once", issues)
             return {
                 "messages": [RemoveMessage(id=last.id)],
-                "guard_note": retry_note(missing),
+                "guard_note": retry_note(issues),
                 "guard_retries": 1,
             }
-        log.warning("ungrounded amounts %s after the retry: safe fallback", sorted(missing))
+        log.warning("not grounded %s after the retry: safe fallback", issues)
         return {
             "messages": [RemoveMessage(id=last.id), AIMessage(content=FALLBACK)],
             "guard_note": None,

@@ -14,6 +14,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from emporio.agent.guard import ungrounded
 from evals.scenarios import SCENARIOS, Scenario
 
 REPORT = Path(__file__).parent / "report.md"
@@ -46,13 +47,16 @@ def main() -> None:
         os.environ["EMPORIO_NOW"] = s.now
         thread = agent.thread_for(s.phone, fresh=True)
         replies, called, models, started = [], [], [], time.perf_counter()
+        evidence, leaks = [], []
         try:
             for message in s.turns:
                 turn = agent.reply(thread, s.phone, message)
                 replies.append(turn.text)
                 called += [name for name, _ in turn.tool_calls]
                 models += [m for m in turn.models if m not in models]
-            failures = check(s, replies, called)
+                evidence += [message, *turn.tool_outputs]
+                leaks += ungrounded(turn.text, evidence)  # the guard should have stopped these
+            failures = check(s, replies, called) + [f"not grounded: {x}" for x in leaks]
         except Exception as error:  # a crash is a failed scenario, not a crashed run
             failures = [f"error: {type(error).__name__}: {error}"]
         seconds = time.perf_counter() - started
