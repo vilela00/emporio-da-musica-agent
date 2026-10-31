@@ -26,6 +26,7 @@ class Ticket:
     summary: str
     phone: str | None
     customer: str | None
+    orders: str | None = None  # filled by the system, not by the model
 
 
 def open_ticket(
@@ -36,6 +37,7 @@ def open_ticket(
     summary: str,
     phone: str | None,
     customer: str | None,
+    orders: str | None = None,
 ) -> Ticket:
     var_dir.mkdir(parents=True, exist_ok=True)
     path = var_dir / "handoffs.jsonl"
@@ -49,6 +51,7 @@ def open_ticket(
         summary=summary.strip(),
         phone=phone,
         customer=customer,
+        orders=orders,
     )
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(asdict(ticket), ensure_ascii=False) + "\n")

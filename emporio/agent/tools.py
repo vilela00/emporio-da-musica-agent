@@ -16,7 +16,7 @@ from emporio.catalog import ROOT, get_store
 from emporio.handoff import open_ticket
 from emporio.hours import store_status
 from emporio.money import brl, money
-from emporio.orders import lookup_orders
+from emporio.orders import digest, lookup_orders
 from emporio.policies import get_policy
 from emporio.pricing import build_quote, priced, quote_amount
 from emporio.search import search
@@ -170,7 +170,8 @@ def create_handoff(runtime: ToolRuntime[Session], reason: HandoffReason, summary
 
     Use for complaints, return/exchange/warranty requests, data deletion requests, instruments that are
     not in the system, or when it is unclear how a policy applies.
-    summary: what happened and what the customer wants, in 1-3 sentences the team can act on.
+    summary: order number if there is one, what happened and what the customer wants, in 1-3
+    sentences the team can act on. The customer's orders are attached to the ticket automatically.
     """
     store = get_store()
     phone = runtime.context.phone if runtime.context else None
@@ -183,6 +184,7 @@ def create_handoff(runtime: ToolRuntime[Session], reason: HandoffReason, summary
         summary=summary,
         phone=phone,
         customer=customer.name if customer else None,
+        orders=digest(store, customer, now.date()) if customer else None,
     )
     return handoff_text(ticket, store_status(now))
 

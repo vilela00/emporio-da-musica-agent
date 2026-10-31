@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from emporio.catalog import Customer, Order, Store
+from emporio.clock import fmt_date
 
 STATUS_LABELS = {
     "pending": "pendente (aguardando confirmação)",
@@ -92,3 +93,17 @@ def lookup_orders(
     if order is None or owner is None or owner.email.lower() != email.strip().lower():
         return Lookup(None, [], NOT_CONFIRMED)  # same answer for 'no such order': no enumeration
     return Lookup(owner, [order])
+
+
+def digest(store: Store, customer: Customer, today: date) -> str:
+    """One line per order, attached to handoff tickets so the team does not have to look them up."""
+    lines = []
+    for order in store.orders_of(customer.id):
+        bits = [f"#{order.id} {order.status}", f"total {order.total}"]
+        if order.tracking_code:
+            bits.append(f"rastreio {order.tracking_code}")
+        if order.estimated_delivery:
+            late = " (atrasado)" if is_late(order, today) else ""
+            bits.append(f"previsão {fmt_date(order.estimated_delivery)}{late}")
+        lines.append(", ".join(bits))
+    return "; ".join(lines) or "sem pedidos"

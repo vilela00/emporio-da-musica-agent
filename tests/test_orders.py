@@ -1,6 +1,6 @@
 from datetime import date
 
-from emporio.orders import NOT_CONFIRMED, deadlines, is_late, lookup_orders
+from emporio.orders import NOT_CONFIRMED, deadlines, digest, is_late, lookup_orders
 
 LETICIA = "(67) 99789-0123"   # customer 14, order 7
 ANA = "+55 67 99654-7821"     # customer 2, order 8
@@ -36,3 +36,9 @@ def test_return_and_warranty_deadlines(store):
 def test_late_shipment(store):
     assert is_late(store.orders[8], date(2026, 3, 23))
     assert not is_late(store.orders[8], date(2026, 2, 27))
+
+
+def test_digest_for_handoff_tickets(store):
+    ana = store.customer_by_phone("+55 67 99654-7821")
+    text = digest(store, ana, date(2026, 4, 3))
+    assert text == "#8 shipped, total 349.90, rastreio BRJL5544332BR, previsão 28/02/2026 (atrasado)"
