@@ -265,7 +265,8 @@ def orders_text(store: Store, lookup: Lookup, today: date) -> str:
 
 def handoff_text(ticket: Ticket, status: StoreStatus) -> str:
     sla = (
-        "Retorno da equipe em até 24 horas úteis (manual §7.3)."
+        "Retorno da equipe em até 24 horas úteis (manual §7.3). Diga esse prazo ao cliente, sem prometer o que "
+        "a equipe vai fazer."
         if ticket.reason == "reclamacao"
         else "O manual não define prazo para este tipo de pedido: a equipe responde por este WhatsApp "
         "no horário de atendimento. Não prometa dia nem hora."

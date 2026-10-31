@@ -1,11 +1,14 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
+from emporio.clock import STORE_TZ
+from emporio.handoff import Ticket
+from emporio.hours import store_status
 from emporio.money import money_mentions
 from emporio.orders import lookup_orders
 from emporio.pricing import build_quote, priced
 from emporio.shipping import shipping_for
-from emporio.views import orders_text, product_card, quote_text
+from emporio.views import handoff_text, orders_text, product_card, quote_text
 
 
 def test_product_card_prices_and_past_promotion(store):
@@ -52,3 +55,9 @@ def test_quote_explains_plans_outside_1_to_12(store):
 def test_active_promotion_reads_as_one_phrase(store):
     card = product_card(store, store.products[90])
     assert "de R$ 2.399,00 por R$ 1.967,18, 18% de desconto" in card and "manual §6.2" in card
+
+
+def test_complaint_ticket_gives_the_deadline_and_nothing_more():
+    ticket = Ticket("EM-20260403-001", "2026-04-03T19:40", "reclamacao", "Pedido #8 atrasado", None, None)
+    text = handoff_text(ticket, store_status(datetime(2026, 4, 3, 19, 40, tzinfo=STORE_TZ)))
+    assert "24 horas úteis" in text and "sem prometer o que a equipe vai fazer" in text
