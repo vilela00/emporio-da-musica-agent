@@ -10,6 +10,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 
 from emporio.agent.graph import build_graph, text_of
 from emporio.agent.prompts import Session
+from emporio.agent.whatsapp import whatsapp_text
 from emporio.catalog import ROOT, phone_digits
 
 
@@ -43,7 +44,7 @@ class Agent:
         )
         messages = state["messages"]
         start = max(i for i, m in enumerate(messages) if m.type == "human")
-        turn = Turn(text=text_of(messages[-1]))
+        turn = Turn(text=whatsapp_text(text_of(messages[-1])))
         for message in messages[start + 1 :]:
             if message.type == "ai":
                 turn.tool_calls += [(c["name"], c["args"]) for c in message.tool_calls or []]
