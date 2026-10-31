@@ -59,7 +59,8 @@ class Agent:
         if len(text) > MAX_MESSAGE_CHARS:  # answered without calling the model
             return Turn(text=TOO_LONG)
         state = self.graph.invoke(
-            {"messages": [HumanMessage(content=text)]},
+            # a turn that failed halfway (503 during a guard retry) must not leave its note for the next one
+            {"messages": [HumanMessage(content=text)], "guard_note": None, "guard_retries": 0},
             config={"configurable": {"thread_id": thread_id}, "recursion_limit": RECURSION_LIMIT},
             context=Session(phone=phone),
         )
