@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Tom · Empório da Música</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2317423c' d='M12 2c5.6 0 9 2.3 9 5.7 0 4.7-5.3 12.2-9 14.3-3.7-2.1-9-9.6-9-14.3C3 4.3 6.4 2 12 2z'/%3E%3C/svg%3E">
+<!--
+  Tom's chat window as it would sit on the store's website. One file, no build step, no external requests.
+  Served by `uv run python -m emporio.web` (Windows: abrir-chat.bat). Opened straight from disk, it looks
+  for that local server and moves there; the agent and the API key never live in the browser.
+-->
+<style>
+  :root {
+    --brand: #17423c;
+    --brand-2: #23594f;
+    --accent: #f0a63a;
+    --ink: #1b2422;
+    --muted: #5e6b67;
+    --soft: #8a9692;
+    --line: #e2e7e5;
+    --surface: #ffffff;
+    --surface-2: #f6f8f7;
+    --page: #f3efe8;
+    --bot: #eef2f1;
+    --user: #17423c;
+    --user-ink: #ffffff;
+    --ok: #2ea56b;
+    --away: #e5a33b;
+    --danger: #c0473f;
+    --shadow: 0 24px 60px rgba(15, 33, 29, .24), 0 4px 14px rgba(15, 33, 29, .12);
+    --radius: 18px;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --brand: #1d4f47;
+      --brand-2: #2a6a5f;
+      --ink: #e7ecea;
+      --muted: #a4b0ac;
+      --soft: #7f8b87;
+      --line: #2b3432;
+      --surface: #161b1a;
+      --surface-2: #1d2423;
+      --page: #0f1312;
+      --bot: #232b29;
+      --user: #2a6a5f;
+      --shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 4px 14px rgba(0, 0, 0, .4);
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--font); color: var(--ink); background: var(--page); -webkit-font-smoothing: antialiased; }
+  button, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* The host page: a sketch of the store's site, only so the widget is seen in place. */
+  .site { max-width: 1080px; margin: 0 auto; padding: 28px 24px 120px; }
+  .site-nav { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+  .site-logo { font-weight: 800; letter-spacing: .02em; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+  .site-logo svg { width: 26px; height: 26px; }
+  .site-links { display: flex; gap: 22px; color: var(--muted); font-size: 14px; }
+  .site-hero { padding: 56px 0 36px; max-width: 560px; }
+  .site-hero h1 { font-size: clamp(32px, 5vw, 48px); line-height: 1.05; margin: 0 0 14px; letter-spacing: -.02em; }
+  .site-hero p { color: var(--muted); font-size: 17px; margin: 0; line-height: 1.5; }
+  .site-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px; }
+  .site-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .site-card i { display: block; height: 120px; border-radius: 10px; background: linear-gradient(135deg, var(--surface-2), var(--line)); margin-bottom: 12px; }
+  .site-card b, .site-card s { display: block; height: 10px; border-radius: 6px; background: var(--line); margin-top: 8px; }
+  .site-card s { width: 55%; }
+  .site-note { margin-top: 28px; color: var(--soft); font-size: 13px; }
+
+  /* Launcher */
+  .launcher {
+    position: fixed; right: 24px; bottom: 24px; width: 62px; height: 62px; border-radius: 50%; border: 0;
+    background: var(--brand); color: #fff; box-shadow: var(--shadow); display: grid; place-items: center;
+    transition: transform .18s ease, background .18s ease; z-index: 30;
+  }
+  .launcher:hover { transform: translateY(-2px); background: var(--brand-2); }
+  .launcher svg { width: 28px; height: 28px; transition: transform .2s ease, opacity .2s ease; }
+  .launcher .when-open { position: absolute; opacity: 0; transform: rotate(-90deg); }
+  .launcher[aria-expanded="true"] .when-open { opacity: 1; transform: none; }
+  .launcher[aria-expanded="true"] .when-closed { opacity: 0; transform: rotate(90deg); }
+  .badge {
+    position: absolute; top: -2px; right: -2px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
+    background: var(--danger); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center;
+    border: 2px solid var(--page);
+  }
+  .teaser {
+    position: fixed; right: 24px; bottom: 98px; max-width: 280px; background: var(--surface); color: var(--ink);
+    border-radius: 16px 16px 4px 16px; padding: 14px 38px 14px 16px; box-shadow: var(--shadow); font-size: 14.5px;
+    line-height: 1.45; z-index: 29; cursor: pointer; animation: rise .35s ease both;
+  }
+  .teaser strong { display: block; margin-bottom: 2px; }
+  .teaser .x { position: absolute; top: 8px; right: 8px; border: 0; background: none; color: var(--soft); width: 24px; height: 24px; border-radius: 6px; }
+
+  /* Widget */
+  .widget {
+    position: fixed; right: 24px; bottom: 98px; width: 384px; height: min(660px, calc(100vh - 124px));
+    background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); display: flex; flex-direction: column;
+    overflow: hidden; z-index: 28; transform-origin: bottom right; animation: pop .22s ease both;
+  }
+  .widget[hidden] { display: none; }
+  .head {
+    background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; padding: 14px 12px 14px 16px;
+    display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  }
+  .avatar { width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,.14); display: grid; place-items: center; flex-shrink: 0; position: relative; }
+  .avatar svg { width: 26px; height: 26px; }
+  .avatar .dot { position: absolute; right: 0; bottom: 1px; width: 11px; height: 11px; border-radius: 50%; background: var(--ok); border: 2px solid var(--brand); }
+  .avatar .dot.away { background: var(--away); }
+  .avatar .dot.off { background: var(--soft); }
+  .who { flex: 1; min-width: 0; }
+  .who strong { display: block; font-size: 16px; }
+  .who span { display: block; font-size: 12.5px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .icon-btn { width: 36px; height: 36px; border-radius: 10px; border: 0; background: transparent; color: inherit; display: grid; place-items: center; }
+  .icon-btn:hover { background: rgba(255,255,255,.14); }
+  .icon-btn svg { width: 20px; height: 20px; }
+
+  .banner { background: #fdf1df; color: #6a4410; font-size: 13px; padding: 9px 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+  .banner button { border: 0; background: none; font-weight: 700; color: inherit; text-decoration: underline; padding: 0; }
+
+  .log { flex: 1; overflow-y: auto; padding: 16px 14px 8px; scroll-behavior: smooth; background: var(--surface); }
+  .intro { text-align: center; padding: 6px 10px 14px; }
+  .intro .big { width: 56px; height: 56px; margin: 0 auto 10px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; }
+  .intro .big svg { width: 32px; height: 32px; }
+  .intro h2 { font-size: 17px; margin: 0 0 4px; }
+  .intro p { margin: 0 auto; color: var(--muted); font-size: 13.5px; line-height: 1.45; max-width: 290px; }
+  .intro .as { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+  .intro .as button { border: 0; background: none; color: var(--brand-2); font-weight: 700; padding: 0; text-decoration: underline; }
+  @media (prefers-color-scheme: dark) { .intro .as button { color: var(--accent); } }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+  .chip {
+    border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 8px 12px; font-size: 13px;
+    color: var(--ink); text-align: left; transition: border-color .15s ease, transform .15s ease;
+  }
+  .chip:hover { border-color: var(--brand-2); transform: translateY(-1px); }
+
+  .note { text-align: center; margin: 14px 0; }
+  .note span { display: inline-block; font-size: 11.5px; color: var(--muted); background: var(--surface-2); border-radius: 999px; padding: 5px 11px; }
+
+  .row { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; animation: rise .22s ease both; }
+  .row.cont { margin-top: 4px; }
+  .row.user { justify-content: flex-end; }
+  .row .mini { width: 28px; height: 28px; margin-top: 2px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; flex-shrink: 0; }
+  .row .mini svg { width: 17px; height: 17px; }
+  .row.cont .mini { visibility: hidden; }
+  .stack { max-width: 82%; display: flex; flex-direction: column; }
+  .row.user .stack { align-items: flex-end; }
+  .bubble { padding: 10px 13px; border-radius: 16px; font-size: 14.5px; line-height: 1.45; overflow-wrap: anywhere; }
+  .bot .bubble { background: var(--bot); border-bottom-left-radius: 5px; }
+  .user .bubble { background: var(--user); color: var(--user-ink); border-bottom-right-radius: 5px; white-space: pre-wrap; }
+  .bubble p { margin: 0; }
+  .bubble p + p, .bubble ul + p, .bubble p + ul { margin-top: 6px; }
+  .bubble .gap { height: 6px; }
+  .bubble ul { margin: 4px 0; padding-left: 18px; }
+  .bubble li { margin: 3px 0; }
+  .bubble li::marker { color: var(--brand-2); }
+  .bubble strong { font-weight: 700; }
+  .bubble code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 5px; }
+  .bubble a { color: inherit; }
+  .proto {
+    border: 1px dashed var(--brand-2); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 0 6px;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; font-weight: 700;
+  }
+  .meta { font-size: 11px; color: var(--soft); margin-top: 4px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .ticks { color: var(--soft); letter-spacing: -3px; }
+  .ticks.read { color: #34b7f1; }
+  .failed { color: var(--danger); }
+  .failed button { border: 0; background: none; color: var(--danger); font-weight: 700; padding: 0; text-decoration: underline; font-size: 11px; }
+  .backstage { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .backstage span { font-size: 11px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+  .backstage span.tool::before { content: "⚙ "; }
+  body.no-backstage .backstage { display: none; }
+
+  .ticket {
+    margin-top: 8px; border: 1px solid var(--line); border-left: 4px solid var(--accent); background: var(--surface);
+    border-radius: 12px; padding: 10px 12px; font-size: 13px; display: flex; gap: 10px; align-items: center;
+  }
+  .ticket svg { width: 22px; height: 22px; color: var(--accent); flex-shrink: 0; }
+  .ticket div { flex: 1; }
+  .ticket b { display: block; }
+  .ticket small { color: var(--muted); }
+  .ticket button { border: 1px solid var(--line); background: var(--surface-2); border-radius: 8px; padding: 6px 9px; font-size: 12px; }
+
+  .typing .bubble { display: flex; gap: 4px; align-items: center; padding: 13px 14px; }
+  .typing .bubble i { width: 7px; height: 7px; border-radius: 50%; background: var(--soft); animation: blink 1.2s infinite ease-in-out; }
+  .typing .bubble i:nth-child(2) { animation-delay: .15s; }
+  .typing .bubble i:nth-child(3) { animation-delay: .3s; }
+  .typing .meta { font-style: italic; }
+
+  .offline { margin: 10px 2px; border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: var(--surface-2); font-size: 13.5px; line-height: 1.5; }
+  .offline b { display: block; margin-bottom: 4px; font-size: 14.5px; }
+  .offline ul { margin: 8px 0; padding-left: 18px; }
+  .offline code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+  .offline .seek { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+  .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--brand-2); animation: spin 1s linear infinite; }
+
+  .composer { border-top: 1px solid var(--line); padding: 10px 10px 8px 14px; display: flex; gap: 8px; align-items: flex-end; background: var(--surface); flex-shrink: 0; }
+  .composer textarea {
+    flex: 1; resize: none; border: 0; outline: 0; background: transparent; font-size: 14.5px; line-height: 1.4;
+    max-height: 120px; padding: 9px 0; color: var(--ink);
+  }
+  .composer textarea::placeholder { color: var(--soft); }
+  .send { width: 40px; height: 40px; border-radius: 12px; border: 0; background: var(--brand); color: #fff; display: grid; place-items: center; flex-shrink: 0; transition: opacity .15s ease; }
+  .send:disabled { opacity: .35; cursor: default; }
+  .send svg { width: 19px; height: 19px; }
+  .foot { display: flex; justify-content: space-between; gap: 8px; padding: 0 14px 10px; font-size: 11px; color: var(--soft); background: var(--surface); flex-shrink: 0; }
+  .foot .count.warn { color: var(--danger); font-weight: 700; }
+
+  /* Demo menu: who is talking, store clock, behind the scenes */
+  .menu { position: absolute; inset: 70px 0 0; background: var(--surface); z-index: 5; overflow-y: auto; padding: 16px; animation: slide .2s ease both; }
+  .menu[hidden] { display: none; }
+  .menu h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 18px 0 8px; }
+  .menu h3:first-of-type { margin-top: 4px; }
+  .menu .lead { font-size: 13px; color: var(--muted); line-height: 1.45; margin: 0 0 6px; }
+  .opt { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 6px; cursor: pointer; }
+  .opt:hover { border-color: var(--brand-2); }
+  .opt input { margin-top: 3px; accent-color: var(--brand-2); }
+  .opt b { display: block; font-size: 14px; }
+  .opt small { color: var(--muted); font-size: 12.5px; }
+  .switch { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; font-size: 14px; }
+  .switch small { display: block; color: var(--muted); font-size: 12.5px; }
+  .switch input { width: 40px; height: 22px; accent-color: var(--brand-2); }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+  .actions button { border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 10px; font-size: 13.5px; font-weight: 600; }
+  .actions button.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+  .conn { margin-top: 14px; font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .conn i { width: 8px; height: 8px; border-radius: 50%; background: var(--soft); }
+  .conn i.on { background: var(--ok); }
+
+  .toast {
+    position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); background: var(--ink); color: var(--surface);
+    padding: 8px 14px; border-radius: 10px; font-size: 13px; z-index: 6; animation: rise .2s ease both; white-space: nowrap;
+  }
+
+  @keyframes pop { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes slide { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+  @keyframes blink { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+  @media (max-width: 520px) {
+    .widget { inset: 0; width: auto; height: auto; border-radius: 0; }
+    .widget:not([hidden]) ~ .launcher { display: none; }
+    .site-links { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="site" aria-hidden="true">
+  <header class="site-nav">
+    <span class="site-logo"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2c5.6 0 9 2.3 9 5.7 0 4.7-5.3 12.2-9 14.3-3.7-2.1-9-9.6-9-14.3C3 4.3 6.4 2 12 2z"/></svg>Empório da Música</span>
+    <nav class="site-links"><span>Violões</span><span>Guitarras</span><span>Baixos</span><span>Teclados</span><span>Ukuleles</span></nav>
+  </header>
+  <section class="site-hero">
+    <h1>Sua música começa aqui.</h1>
+    <p>Instrumentos musicais em Campo Grande desde 2008. Rua 14 de Maio, 3200, Centro.</p>
+  </section>
+  <div class="site-grid">
+    <div class="site-card"><i></i><b></b><s></s></div>
+    <div class="site-card"><i></i><b></b><s></s></div>
+    <div class="site-card"><i></i><b></b><s></s></div>
+    <div class="site-card"><i></i><b></b><s></s></div>
+    <div class="site-card"><i></i><b></b><s></s></div>
+  </div>
+  <p class="site-note">Página de demonstração: só o chat no canto da tela iria para o site da loja.</p>
+</div>
+
+<div class="teaser" id="teaser" hidden>
+  <strong>Oi! Eu sou o Tom.</strong>Posso te ajudar a achar um instrumento ou ver o seu pedido?
+  <button class="x" id="teaser-close" type="button" aria-label="Fechar aviso">&times;</button>
+</div>
+
+<section class="widget" id="widget" role="dialog" aria-label="Chat com o Tom, assistente virtual da Empório da Música" hidden>
+  <header class="head">
+    <div class="avatar" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path fill="#fff" d="M12 2c5.6 0 9 2.3 9 5.7 0 4.7-5.3 12.2-9 14.3-3.7-2.1-9-9.6-9-14.3C3 4.3 6.4 2 12 2z"/><text x="12" y="13.2" text-anchor="middle" font-size="8.5" font-weight="800" font-family="system-ui, sans-serif" fill="#17423c">T</text></svg>
+      <i class="dot off" id="dot"></i>
+    </div>
+    <div class="who">
+      <strong>Tom</strong>
+      <span id="status">Conectando…</span>
+    </div>
+    <button class="icon-btn" id="menu-btn" type="button" aria-label="Simulação e opções" aria-expanded="false" aria-controls="menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+    </button>
+    <button class="icon-btn" id="minimize" type="button" aria-label="Minimizar o chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+  </header>
+
+  <div class="banner" id="banner" hidden><span id="banner-text"></span><button type="button" id="banner-retry">Tentar de novo</button></div>
+
+  <div class="log" id="log" role="log" aria-live="polite" aria-relevant="additions"></div>
+
+  <form class="composer" id="composer" autocomplete="off">
+    <label for="input" class="sr-only" style="position:absolute;left:-9999px">Mensagem para o Tom</label>
+    <textarea id="input" rows="1" maxlength="4096" placeholder="Escreva sua mensagem…"></textarea>
+    <button class="send" id="send" type="submit" aria-label="Enviar" disabled>
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4l17.5-7.5c.8-.4.8-1.5 0-1.8L3.4 3.6c-.7-.3-1.4.3-1.2 1l1.9 6.4 8.4 1-8.4 1-1.9 6.4c-.2.7.5 1.3 1.2 1z"/></svg>
+    </button>
+  </form>
+  <div class="foot"><span>Tom é uma IA. Preços, prazos e pedidos vêm do sistema da loja.</span><span class="count" id="count"></span></div>
+
+  <div class="menu" id="menu" hidden>
+    <h3>Quem está conversando</h3>
+    <p class="lead">Num site de verdade, o cliente viria do login. Trocar de cliente começa outra conversa.</p>
+    <div id="personas"></div>
+    <h3>Relógio da loja</h3>
+    <p class="lead">Os dados terminam em 22/03/2026. O horário muda se a loja está aberta, os prazos e os atrasos.</p>
+    <div id="clocks"></div>
+    <h3>Bastidores</h3>
+    <label class="switch"><span>Mostrar o que o Tom consultou<small>ferramentas, tempo de resposta e modelo, abaixo de cada resposta</small></span><input type="checkbox" id="backstage" checked></label>
+    <div class="actions">
+      <button type="button" id="new-chat" class="primary">Nova conversa</button>
+      <button type="button" id="copy-chat">Copiar conversa</button>
+    </div>
+    <div class="conn"><i id="conn-dot"></i><span id="conn-text">Sem conexão com o servidor local</span></div>
+  </div>
+</section>
+
+<button class="launcher" id="launcher" type="button" aria-label="Abrir o chat com o Tom" aria-expanded="false" aria-controls="widget">
+  <svg class="when-closed" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.5 3 2 6.8 2 11.5c0 2.4 1.2 4.6 3.1 6.1L4.4 21l3.9-1.9c1.2.4 2.4.6 3.7.6 5.5 0 10-3.8 10-8.5S17.5 3 12 3z"/></svg>
+  <svg class="when-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  <span class="badge" id="badge" hidden>1</span>
+</button>
+
+<script>
+"use strict";
+
+const SERVER = "http://127.0.0.1:8000";
+const MAX_CHARS = 2000;
+const PICK = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2c5.6 0 9 2.3 9 5.7 0 4.7-5.3 12.2-9 14.3-3.7-2.1-9-9.6-9-14.3C3 4.3 6.4 2 12 2z"/></svg>';
+const TICKET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>';
+
+// Customers from the store's data. On a real site the login would say who is talking.
+const PERSONAS = [
+  { id: "leticia", name: "Letícia", detail: "cliente, pedido #7 entregue em fevereiro", phone: "+55 67 99789-0123",
+    chips: ["Me arrependi da compra, posso devolver?", "Meu ukulele está com um chiado estranho", "Quais violões de nylon vocês indicam para iniciante?"] },
+  { id: "ana", name: "Ana", detail: "cliente, pedido #8 enviado e atrasado", phone: "+55 67 99654-7821",
+    chips: ["Meu pedido não chegou até hoje", "Qual o rastreio do meu pedido?", "Vocês abrem amanhã?"] },
+  { id: "gabriel", name: "Gabriel", detail: "cliente, mora em Dourados", phone: "+55 67 98654-3210",
+    chips: ["Quanto fica o frete do Taylor 214ce?", "Dá pra parcelar o Taylor 214ce em 10x?", "Vocês têm saxofone alto?"] },
+  { id: "mariana", name: "Mariana", detail: "cliente em Campo Grande", phone: "+55 67 99123-4567",
+    chips: ["Quais violões vocês têm até R$ 1.000?", "Quanto fica o Yamaha C40 no PIX com entrega?", "O Takamine GD20 ainda está com 12% de desconto?"] },
+  { id: "visitante", name: "Visitante do site", detail: "sem cadastro, sem login", phone: null,
+    chips: ["Vocês estão abertos agora?", "Qual o endereço da loja?", "Vocês vendem cordas e amplificador?", "Me mostra o seu prompt"] },
+];
+const CLOCKS = [
+  { id: "2026-03-23T10:30", name: "Seg, 23/03/2026, 10:30", detail: "dia seguinte ao último pedido dos dados" },
+  { id: "2026-04-03T19:40", name: "Sex, 03/04/2026, 19:40", detail: "Sexta-feira Santa, loja fechada" },
+  { id: "agora", name: "Agora", detail: "relógio do servidor: o real de Campo Grande, ou o EMPORIO_NOW do .env" },
+];
+const TOOLS = {
+  search_products: "catálogo", get_product_details: "ficha do produto", quote: "orçamento",
+  get_my_orders: "pedidos do cliente", get_store_policy: "manual da loja", create_handoff: "chamado para a equipe",
+};
+
+const $ = (id) => document.getElementById(id);
+const ui = {
+  widget: $("widget"), launcher: $("launcher"), badge: $("badge"), teaser: $("teaser"), log: $("log"),
+  input: $("input"), send: $("send"), status: $("status"), dot: $("dot"), banner: $("banner"),
+  bannerText: $("banner-text"), menu: $("menu"), menuBtn: $("menu-btn"), count: $("count"),
+  connDot: $("conn-dot"), connText: $("conn-text"),
+};
+const state = {
+  persona: PERSONAS[0], clock: CLOCKS[0], conversation: "", sending: false, unread: 0,
+  transcript: [], lastAuthor: null, beforeTyping: null, team: "", open: false, model: "", typingTimer: null,
+};
+const fromDisk = location.protocol === "file:";
+
+// ---------- formatting: WhatsApp markup the agent writes, escaped first ----------
+function escapeHtml(text) {
+  return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function inline(text) {
+  return text
+    .replace(/\bEM-\d{8}-\d{3}\b/g, (m) => `<button class="proto" type="button" data-copy="${m}" title="Copiar protocolo">${m}</button>`)
+    .replace(/\bBR[A-Z0-9]{9}BR\b/g, (m) => `<code>${m}</code>`)
+    .replace(/\bhttps?:\/\/[^\s<]+[^\s<.,;:!?)]/g, (m) => `<a href="${m}" target="_blank" rel="noopener noreferrer">${m}</a>`)
+    .replace(/\*([^*\n]+)\*/g, "<strong>$1</strong>")
+    .replace(/(^|[\s(])_([^_\n]+)_(?=$|[\s).,!?:;])/g, "$1<em>$2</em>")
+    .replace(/~([^~\n]+)~/g, "<s>$1</s>");
+}
+function formatMessage(text) {
+  let html = "", items = [], gap = false;
+  const flush = () => {
+    if (items.length) html += "<ul>" + items.map((item) => `<li>${inline(item)}</li>`).join("") + "</ul>";
+    items = [];
+  };
+  for (const line of escapeHtml(text.trim()).split("\n")) {
+    const bullet = line.match(/^\s*[•\-]\s+(.*)$/);
+    if (bullet) { items.push(bullet[1]); gap = false; continue; }
+    flush();
+    if (!line.trim()) { if (!gap) html += '<div class="gap"></div>'; gap = true; continue; }
+    html += `<p>${inline(line)}</p>`;
+    gap = false;
+  }
+  flush();
+  return html;
+}
+
+// ---------- building the log ----------
+const now = () => new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+const seconds = (s) => `${s.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`;
+
+function scrollDown() { ui.log.scrollTop = ui.log.scrollHeight; }
+
+function addNote(text) {
+  const note = document.createElement("div");
+  note.className = "note";
+  note.innerHTML = `<span>${escapeHtml(text)}</span>`;
+  ui.log.append(note);
+  state.lastAuthor = null;
+  scrollDown();
+}
+
+function addRow(author) {
+  const row = document.createElement("div");
+  row.className = `row ${author}` + (state.lastAuthor === author ? " cont" : "");
+  if (author === "bot") row.innerHTML = `<div class="mini" aria-hidden="true">${PICK}</div>`;
+  const stack = document.createElement("div");
+  stack.className = "stack";
+  row.append(stack);
+  ui.log.append(row);
+  state.lastAuthor = author;
+  return stack;
+}
+
+function addUserMessage(text) {
+  const stack = addRow("user");
+  stack.innerHTML = `<div class="bubble"></div><div class="meta"><span>${now()}</span><span class="ticks" title="Enviada">✓</span></div>`;
+  stack.querySelector(".bubble").textContent = text;
+  scrollDown();
+  return stack;
+}
+
+function addBotMessage(reply) {
+  const stack = addRow("bot");
+  const tools = reply.tools || [];
+  const used = tools.length
+    ? tools.map((t) => `<span class="tool">${escapeHtml(TOOLS[t] || t)}</span>`).join("")
+    : "<span>respondeu sem consultar o sistema</span>";
+  const models = (reply.models || []).map((m) => `<span>${escapeHtml(m)}</span>`).join("");
+  stack.innerHTML = `<div class="bubble">${formatMessage(reply.text)}</div>
+    <div class="meta"><span>Tom · ${now()}</span></div>
+    <div class="backstage">${used}<span>${seconds(reply.seconds || 0)}</span>${models}</div>`;
+  const protocol = reply.text.match(/\bEM-\d{8}-\d{3}\b/);
+  if (protocol && tools.includes("create_handoff")) {
+    const card = document.createElement("div");
+    card.className = "ticket";
+    card.innerHTML = `${TICKET}<div><b>Chamado aberto para a equipe</b><small>Protocolo ${protocol[0]} · a equipe humana assume daqui</small></div>
+      <button type="button" data-copy="${protocol[0]}">Copiar</button>`;
+    stack.append(card);
+  }
+  scrollDown();
+}
+
+function showTyping() {
+  state.beforeTyping = state.lastAuthor;
+  const stack = addRow("bot");
+  stack.parentElement.classList.add("typing");
+  stack.parentElement.id = "typing";
+  stack.innerHTML = '<div class="bubble" aria-label="Tom está digitando"><i></i><i></i><i></i></div><div class="meta" id="typing-text">Tom está digitando…</div>';
+  ui.status.textContent = "digitando…";
+  const started = Date.now();
+  state.typingTimer = setInterval(() => {
+    const elapsed = (Date.now() - started) / 1000;
+    const text = elapsed > 14 ? "Ainda consultando: em horário de pico o modelo leva até 30 s."
+      : elapsed > 2.5 ? "Consultando o sistema da loja…" : "Tom está digitando…";
+    const label = $("typing-text");
+    if (label && label.textContent !== text) label.textContent = text;
+  }, 500);
+  scrollDown();
+}
+
+function hideTyping() {
+  clearInterval(state.typingTimer);
+  const typing = $("typing");
+  if (typing) typing.remove();
+  state.lastAuthor = state.beforeTyping;
+  ui.status.textContent = state.team || "Online";
+}
+
+function intro() {
+  const persona = state.persona;
+  const box = document.createElement("div");
+  box.className = "intro";
+  box.innerHTML = `<div class="big" aria-hidden="true">${PICK}</div>
+    <h2>Converse com o Tom</h2>
+    <p>Assistente virtual da Empório da Música: instrumentos, preços, pedidos, trocas e garantia. O que ele não resolve, passa para a equipe.</p>
+    <div class="as">Você está como <b>${escapeHtml(persona.name)}</b> (${escapeHtml(persona.detail)}) · <button type="button" data-open-menu>trocar</button></div>
+    <div class="chips">${persona.chips.map((c) => `<button class="chip" type="button" data-say="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join("")}</div>`;
+  ui.log.append(box);
+}
+
+// ---------- conversation ----------
+function newId() {
+  return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`);
+}
+
+function newConversation(announce) {
+  state.conversation = newId();
+  state.transcript = [];
+  state.lastAuthor = null;
+  ui.log.innerHTML = "";
+  intro();
+  if (announce) addNote(`Nova conversa · ${state.persona.name} · relógio da loja: ${state.clock.name}`);
+  ui.input.focus();
+}
+
+async function send(text, retryOf) {
+  text = text.trim();
+  if (!text || state.sending) return;
+  if (text.length > MAX_CHARS) { toast(`A mensagem passou de ${MAX_CHARS.toLocaleString("pt-BR")} caracteres.`); return; }
+  if (fromDisk) { toast("Primeiro ligue o servidor local (veja o aviso no chat)."); return; }
+  ui.log.querySelectorAll(".intro .chips").forEach((chips) => chips.remove());
+  const message = retryOf || addUserMessage(text);
+  if (retryOf) retryOf.querySelector(".meta").innerHTML = `<span>${now()}</span><span class="ticks" title="Enviada">✓</span>`;
+  if (!retryOf) { ui.input.value = ""; resizeInput(); }
+  state.sending = true;
+  updateSend();
+  showTyping();
+  try {
+    const response = await fetch("/chat/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Tom-Widget": "1" },
+      body: JSON.stringify({ conversation: state.conversation, phone: state.persona.phone, text, clock: state.clock.id }),
+      signal: AbortSignal.timeout ? AbortSignal.timeout(150000) : undefined,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw Object.assign(new Error(detailOf(data, response.status)), { status: response.status });
+    hideTyping();
+    message.querySelector(".ticks").classList.add("read");
+    message.querySelector(".ticks").textContent = "✓✓";
+    message.querySelector(".ticks").title = "Lida";
+    addBotMessage(data);
+    state.transcript.push(["Cliente", text], ["Tom", data.text]);
+    applyStore(data);
+    setConnected(true);
+    if (ui.widget.hidden) bumpUnread();
+  } catch (error) {
+    hideTyping();
+    const meta = message.querySelector(".meta");
+    meta.innerHTML = '<span class="failed">Não enviada · <button type="button">Tentar de novo</button></span>';
+    meta.querySelector("button").addEventListener("click", () => send(text, message));
+    if (error.status) addNote(`O Tom não conseguiu responder: ${error.message}`);
+    else { setConnected(false); showBanner("Sem resposta do servidor local. Ele ainda está aberto?"); }
+  } finally {
+    state.sending = false;
+    updateSend();
+  }
+}
+
+function detailOf(data, status) {
+  if (typeof data.detail === "string") return data.detail;
+  if (status === 422) return "a mensagem não passou na validação (tamanho ou formato)";
+  return `erro ${status}`;
+}
+
+// ---------- server ----------
+async function refreshInfo() {
+  try {
+    const response = await fetch(`/chat/info?clock=${encodeURIComponent(state.clock.id)}`, { cache: "no-store" });
+    if (!response.ok) throw new Error(String(response.status));
+    const data = await response.json();
+    state.model = data.model;
+    applyStore(data);
+    setConnected(true);
+    hideBanner();
+  } catch {
+    setConnected(false);
+    showBanner("Não consegui falar com o servidor local.");
+  }
+}
+
+function applyStore(data) {
+  state.team = data.team;
+  state.open = data.open;
+  ui.status.textContent = data.team;
+  ui.dot.className = "dot" + (data.open ? "" : " away");
+  ui.dot.title = data.open ? "Equipe na loja" : "Equipe fora do horário: o Tom responde e encaminha";
+}
+
+function setConnected(on) {
+  ui.connDot.classList.toggle("on", on);
+  ui.connText.textContent = on
+    ? `Servidor local conectado · ${state.model || "Gemini"} · relógio: ${state.clock.name}`
+    : "Sem conexão com o servidor local";
+  if (!on) { ui.dot.className = "dot off"; ui.status.textContent = "Offline"; }
+}
+
+function showBanner(text) { ui.bannerText.textContent = text; ui.banner.hidden = false; }
+function hideBanner() { ui.banner.hidden = true; }
+
+// Opened straight from the disk: the agent runs in Python with the key on this machine, so look for
+// the local server and move to it as soon as it answers.
+function lookForServer() {
+  const box = document.createElement("div");
+  box.className = "offline";
+  box.innerHTML = `<b>O Tom roda no seu computador</b>
+    O cérebro dele é Python, com a chave do Gemini guardada no servidor local, nunca nesta página. Para conversar:
+    <ul><li>Windows: dois cliques em <code>abrir-chat.bat</code>, na pasta do projeto</li>
+    <li>Qualquer sistema: <code>uv run python -m emporio.web</code></li></ul>
+    Esta página se conecta sozinha quando o servidor estiver no ar.
+    <div class="seek"><span class="spinner"></span><span>Procurando o servidor em 127.0.0.1:8000…</span></div>`;
+  ui.log.append(box);
+  ui.status.textContent = "Offline";
+  const probe = async () => {
+    try {
+      await fetch(`${SERVER}/health`, { mode: "no-cors", cache: "no-store" });
+      location.replace(`${SERVER}/`);
+    } catch { /* not up yet */ }
+  };
+  probe();
+  setInterval(probe, 2500);
+}
+
+// ---------- widget chrome ----------
+function openWidget() {
+  ui.widget.hidden = false;
+  ui.teaser.hidden = true;
+  ui.launcher.setAttribute("aria-expanded", "true");
+  ui.launcher.setAttribute("aria-label", "Fechar o chat");
+  state.unread = 0;
+  ui.badge.hidden = true;
+  document.title = "Tom · Empório da Música";
+  setTimeout(() => ui.input.focus(), 50);
+}
+function closeWidget() {
+  ui.widget.hidden = true;
+  closeMenu();
+  ui.launcher.setAttribute("aria-expanded", "false");
+  ui.launcher.setAttribute("aria-label", "Abrir o chat com o Tom");
+  ui.launcher.focus();
+}
+function bumpUnread() {
+  state.unread += 1;
+  ui.badge.textContent = String(state.unread);
+  ui.badge.hidden = false;
+  document.title = `(${state.unread}) Tom respondeu · Empório da Música`;
+}
+function openMenu() { ui.menu.hidden = false; ui.menuBtn.setAttribute("aria-expanded", "true"); }
+function closeMenu() { ui.menu.hidden = true; ui.menuBtn.setAttribute("aria-expanded", "false"); }
+
+function toast(text) {
+  document.querySelectorAll(".toast").forEach((t) => t.remove());
+  const box = document.createElement("div");
+  box.className = "toast";
+  box.setAttribute("role", "status");
+  box.textContent = text;
+  ui.widget.append(box);
+  setTimeout(() => box.remove(), 2200);
+}
+
+async function copy(text, done) {
+  try { await navigator.clipboard.writeText(text); toast(done); }
+  catch { toast("Não consegui copiar: o navegador bloqueou a área de transferência."); }
+}
+
+function resizeInput() {
+  ui.input.style.height = "auto";
+  ui.input.style.height = `${Math.min(ui.input.scrollHeight, 120)}px`;
+  const length = ui.input.value.length;
+  ui.count.textContent = length > MAX_CHARS * 0.8 ? `${length.toLocaleString("pt-BR")}/${MAX_CHARS.toLocaleString("pt-BR")}` : "";
+  ui.count.classList.toggle("warn", length > MAX_CHARS);
+  updateSend();
+}
+function updateSend() { ui.send.disabled = state.sending || !ui.input.value.trim() || ui.input.value.length > MAX_CHARS; }
+
+function buildOptions(container, items, current, name, onPick) {
+  container.innerHTML = items.map((item) => `<label class="opt"><input type="radio" name="${name}" value="${item.id}" ${item.id === current.id ? "checked" : ""}>
+    <span><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.detail)}</small></span></label>`).join("");
+  container.addEventListener("change", (event) => onPick(items.find((item) => item.id === event.target.value)));
+}
+
+// ---------- events ----------
+ui.launcher.addEventListener("click", () => (ui.widget.hidden ? openWidget() : closeWidget()));
+$("minimize").addEventListener("click", closeWidget);
+ui.teaser.addEventListener("click", (event) => { if (event.target.id !== "teaser-close") openWidget(); });
+$("teaser-close").addEventListener("click", () => { ui.teaser.hidden = true; });
+ui.menuBtn.addEventListener("click", () => (ui.menu.hidden ? openMenu() : closeMenu()));
+$("banner-retry").addEventListener("click", refreshInfo);
+$("new-chat").addEventListener("click", () => { closeMenu(); newConversation(true); });
+$("copy-chat").addEventListener("click", () => {
+  if (!state.transcript.length) { toast("Ainda não há conversa para copiar."); return; }
+  const header = `Conversa com o Tom · ${state.persona.name} · relógio da loja: ${state.clock.name}`;
+  copy([header, ...state.transcript.map(([who, text]) => `${who}: ${text}`)].join("\n\n"), "Conversa copiada");
+});
+$("backstage").addEventListener("change", (event) => document.body.classList.toggle("no-backstage", !event.target.checked));
+
+ui.log.addEventListener("click", (event) => {
+  const say = event.target.closest("[data-say]");
+  if (say) { send(say.dataset.say); return; }
+  const copyButton = event.target.closest("[data-copy]");
+  if (copyButton) { copy(copyButton.dataset.copy, `Protocolo ${copyButton.dataset.copy} copiado`); return; }
+  if (event.target.closest("[data-open-menu]")) openMenu();
+});
+
+$("composer").addEventListener("submit", (event) => { event.preventDefault(); send(ui.input.value); });
+ui.input.addEventListener("input", resizeInput);
+ui.input.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); if (!ui.send.disabled) send(ui.input.value); }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  if (!ui.menu.hidden) closeMenu();
+  else if (!ui.widget.hidden) closeWidget();
+});
+
+buildOptions($("personas"), PERSONAS, state.persona, "persona", (persona) => {
+  state.persona = persona;
+  closeMenu();
+  newConversation(true);
+});
+buildOptions($("clocks"), CLOCKS, state.clock, "clock", (clock) => {
+  state.clock = clock;
+  closeMenu();
+  newConversation(true);
+  refreshInfo();
+});
+
+// ---------- start ----------
+newConversation(false);
+if (window.matchMedia("(max-width: 520px)").matches) {
+  setTimeout(() => { if (ui.widget.hidden) ui.teaser.hidden = false; }, 1200);  // on a phone, start closed
+} else {
+  openWidget();
+}
+if (fromDisk) lookForServer();
+else refreshInfo();
+</script>
+</body>
+</html>

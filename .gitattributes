@@ -1,3 +1,4 @@
 * text=auto eol=lf
 # raw challenge files are kept byte-for-byte as delivered
 data/** -text
+*.bat text eol=crlf
