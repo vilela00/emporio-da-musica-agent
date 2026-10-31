@@ -43,7 +43,7 @@ def main() -> None:
     rows, details, quota_errors = [], [], 0
     for index, s in enumerate(chosen):
         if quota_errors >= 2:
-            print(f"{s.id} skip  free daily quota is over; stopping here")
+            print(f"{s.id} skip  the provider is refusing calls (quota or billing)")
             continue
         if index:
             time.sleep(args.delay)
@@ -62,7 +62,7 @@ def main() -> None:
             failures = check(s, replies, called) + [f"not grounded: {x}" for x in leaks]
         except Exception as error:  # a crash is a failed scenario, not a crashed run
             failures = [f"error: {type(error).__name__}: {str(error)[:300]}"]
-            quota_errors += "RESOURCE_EXHAUSTED" in str(error)
+            quota_errors += "RESOURCE_EXHAUSTED" in str(error) or "402" in str(error)
         seconds = time.perf_counter() - started
         status = "pass" if not failures else "FAIL"
         print(f"{s.id} {status:4} {seconds:5.1f}s  {s.title}" + (f"  -> {'; '.join(failures)}" if failures else ""))

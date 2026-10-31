@@ -17,6 +17,11 @@ from emporio.catalog import ROOT, phone_digits
 def model_failure(error: Exception) -> str:
     """Short Portuguese explanation for when every model in the chain failed."""
     text = str(error)
+    if "402" in text or "prepayment" in text.lower():
+        return (
+            "o saldo pré-pago do projeto no Google AI Studio acabou (créditos do Google Cloud não valem "
+            "para a API do Gemini)"
+        )
     if "RESOURCE_EXHAUSTED" in text or "429" in text:
         return "a cota diária gratuita dos modelos Gemini acabou (ela renova à meia-noite, horário do Pacífico)"
     if "UNAVAILABLE" in text or "503" in text:
