@@ -25,9 +25,15 @@ def is_large(product: Product) -> bool:
     return product.category_id in LARGE_CATEGORIES or "piano" in normalize(product.name)
 
 
+def city_key(city: str) -> str:
+    """'Campo Grande/MS', 'Campo Grande - MS', 'campo grande, ms' -> 'campo grande'."""
+    key = normalize(city)
+    return key.removesuffix(" ms") if key.endswith(" ms") else key
+
+
 def shipping_for(city: str | None, subtotal: Decimal, products: list[Product]) -> Shipping:
     if not city:
         return Shipping("unknown", None)
-    if normalize(city) in METRO_CITIES:
+    if city_key(city) in METRO_CITIES:
         return Shipping("metro", Decimal(0) if subtotal >= FREE_SHIPPING_FROM else METRO_FEE)
     return Shipping("other", None, tuple(p for p in products if is_large(p)))

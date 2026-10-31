@@ -18,3 +18,8 @@ def test_payment_section_carries_the_tiers():
 
 def test_unknown_topic():
     assert "Tópico desconhecido" in get_policy("receitas")
+
+
+def test_scope_section_warns_about_the_other_whatsapp_number():
+    text = get_policy("atendimento_e_escopo")
+    assert "(67) 3321-4500" in text and "não informe esse número" in text and "(67) 3341-4444" in text

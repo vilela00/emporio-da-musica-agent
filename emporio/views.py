@@ -1,6 +1,6 @@
 """Plain-text answers the tools hand to the LLM, in Portuguese (the customer's language).
 
-Every amount the agent may quote is printed here, already computed. The price guard
+Every amount the agent may quote is printed here, already computed. The grounding guard
 (emporio/agent/guard.py) only lets through amounts that appeared in a tool output.
 """
 
@@ -72,8 +72,9 @@ def price_text(item: PricedItem) -> str:
     if item.promotion:
         promo = item.promotion
         return (
-            f"de {brl(item.product.price)} por {brl(item.unit_price)} "
-            f"({promo.label}, {promo.percent}% de desconto; o desconto do PIX não acumula)"
+            f"promoção ativa ({promo.label}): de {brl(item.product.price)} por {brl(item.unit_price)}, "
+            f"{promo.percent}% de desconto. Informe os três juntos: preço original, percentual e preço "
+            "promocional (manual §6.2). O desconto do PIX não acumula."
         )
     return f"{brl(item.unit_price)} (no PIX: {brl(item.pix_total)})"
 

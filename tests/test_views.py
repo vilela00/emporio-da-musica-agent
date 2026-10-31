@@ -47,3 +47,8 @@ def test_quote_explains_plans_outside_1_to_12(store):
     quote = build_quote([priced(store, store.products[95])])
     text = quote_text(quote, shipping_for("Campo Grande", quote.subtotal, []), "Campo Grande", 18)
     assert "18x: não existe" in text and "1x a 12x" in text and "abaixo do mínimo" not in text
+
+
+def test_active_promotion_reads_as_one_phrase(store):
+    card = product_card(store, store.products[90])
+    assert "de R$ 2.399,00 por R$ 1.967,18, 18% de desconto" in card and "manual §6.2" in card

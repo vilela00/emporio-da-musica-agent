@@ -16,3 +16,8 @@ def test_other_cities_and_large_items(store):
 
 def test_unknown_city():
     assert shipping_for(None, Decimal(100), []).region == "unknown"
+
+
+def test_campo_grande_written_with_the_state():
+    for city in ("Campo Grande/MS", "Campo Grande - MS", "campo grande, ms", "Campo Grande MS"):
+        assert shipping_for(city, Decimal("100"), []).fee == Decimal("35.00"), city

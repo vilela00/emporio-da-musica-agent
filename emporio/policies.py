@@ -52,6 +52,8 @@ NOTES: dict[str, tuple[str, ...]] = {
         "Promoção só vale se a ferramenta de produto mostrar como ativa; o nome da campanha não indica vigência.",
     ),
     "atendimento_e_escopo": (
+        "WhatsApp e telefone da loja: (67) 3341-4444, como na §1.2. O (67) 3321-4500 citado na §7 diverge "
+        "do resto do manual: não informe esse número.",
         "Não há lista de lojas parceiras no sistema: não invente nomes; diga que a equipe pode indicar.",
         "Sopros e cordas orquestrais aparecem no manual, mas não há itens dessas categorias no sistema "
         "agora: ofereça verificar com a equipe, sem dizer que a loja não vende.",
