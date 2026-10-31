@@ -41,3 +41,9 @@ def test_order_text_has_deadlines(store):
 def test_late_order_tells_the_model_to_register_the_complaint(store):
     text = orders_text(store, lookup_orders(store, phone="+55 67 99654-7821"), date(2026, 4, 3))
     assert "ATRASADO" in text and "create_handoff" in text
+
+
+def test_quote_explains_plans_outside_1_to_12(store):
+    quote = build_quote([priced(store, store.products[95])])
+    text = quote_text(quote, shipping_for("Campo Grande", quote.subtotal, []), "Campo Grande", 18)
+    assert "18x: não existe" in text and "1x a 12x" in text and "abaixo do mínimo" not in text

@@ -19,6 +19,7 @@ from emporio.money import brl, money
 from emporio.orders import digest, lookup_orders
 from emporio.policies import get_policy
 from emporio.pricing import build_quote, priced, quote_amount
+from emporio.safety import MAX_SUMMARY_CHARS, quote_problem
 from emporio.search import search
 from emporio.shipping import shipping_for
 from emporio.views import handoff_text, orders_text, product_card, quote_text, search_text
@@ -111,6 +112,9 @@ def quote(
     amount: use only when there is no product, e.g. "em quantas vezes posso parcelar R$ 600?".
     city: delivery city; leave empty to use the city of the identified customer.
     """
+    problem = quote_problem(product_ids, amount)
+    if problem:
+        return problem
     store = get_store()
     customer = store.customer_by_phone(runtime.context.phone if runtime.context else None)
     city = city or (customer.city if customer else "")
@@ -181,7 +185,7 @@ def create_handoff(runtime: ToolRuntime[Session], reason: HandoffReason, summary
         ROOT / "var",
         at=now,
         reason=reason,
-        summary=summary,
+        summary=summary[:MAX_SUMMARY_CHARS],
         phone=phone,
         customer=customer.name if customer else None,
         orders=digest(store, customer, now.date()) if customer else None,

@@ -16,6 +16,11 @@ MAX_TOOL_ROUNDS = 6
 # Graph steps per message: six rounds of agent + tools, the answer, the guard and one retry fit in 20.
 RECURSION_LIMIT = 30
 
+# Tool arguments come from the model, so they are checked like user input.
+MAX_QUOTE_UNITS = 20  # a bigger order is a job for the team
+MAX_QUOTE_AMOUNT = 1_000_000
+MAX_SUMMARY_CHARS = 600  # a ticket summary is one to three sentences
+
 TOO_LONG = (
     "Sua mensagem ficou longa demais pra eu ler de uma vez. Me manda só o que você precisa, "
     "em uma mensagem mais curta?"
@@ -37,6 +42,15 @@ _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 def clean_message(text: str) -> str:
     """The customer's text without invisible and control characters; newlines and tabs stay."""
     return _CONTROL.sub("", _INVISIBLE.sub("", text)).strip()
+
+
+def quote_problem(product_ids: list[int] | None, amount: float | None) -> str | None:
+    """Why a quote request cannot be priced as asked, or None."""
+    if product_ids and len(product_ids) > MAX_QUOTE_UNITS:
+        return f"Orçamento por aqui vai até {MAX_QUOTE_UNITS} unidades; para mais, ofereça encaminhar para a equipe."
+    if not product_ids and amount is not None and not 0 < amount <= MAX_QUOTE_AMOUNT:
+        return "Valor inválido para orçamento: informe um valor positivo em reais."
+    return None
 
 
 def tool_rounds(messages) -> int:

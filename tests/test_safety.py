@@ -6,6 +6,7 @@ from emporio.safety import (
     MAX_TOOL_ROUNDS,
     RECURSION_LIMIT,
     clean_message,
+    quote_problem,
     tool_rounds,
 )
 
@@ -44,3 +45,10 @@ def test_what_customers_really_type_survives():
 
 def test_message_cap_is_below_what_the_api_accepts():
     assert MAX_MESSAGE_CHARS < API_MAX_CHARS == 4096
+
+
+def test_quote_arguments_are_checked_like_user_input():
+    assert quote_problem([95], None) is None and quote_problem(None, 600) is None
+    assert "até 20 unidades" in quote_problem([95] * 21, None)
+    for amount in (0, -50, float("nan"), 10**9):
+        assert "Valor inválido" in quote_problem(None, amount)

@@ -17,6 +17,7 @@ from emporio.money import brl
 from emporio.orders import STATUS_LABELS, Lookup, deadlines, is_late, payment_label
 from emporio.pricing import (
     COMBINED_PAYMENT_ABOVE,
+    MAX_INSTALLMENTS,
     PricedItem,
     Quote,
     installment_value,
@@ -162,7 +163,12 @@ def quote_text(quote: Quote, shipping: Shipping, city: str | None, installments:
         f"Débito ou boleto: {brl(total)} (boleto compensa em até 3 dias úteis)",
         f"Crédito sem juros: até {_max_plan(total)}",
     ]
-    if installments:
+    if installments is not None and not 1 <= installments <= MAX_INSTALLMENTS:
+        lines.append(
+            f"Parcelamento em {installments}x: não existe; no crédito vai de 1x a {MAX_INSTALLMENTS}x sem juros "
+            "(manual §3)."
+        )
+    elif installments:
         value = installment_value(total, installments)
         if installments_allowed(total, installments):
             lines.append(f"Parcelamento em {installments}x: permitido, {installments}x de {brl(value)}.")
