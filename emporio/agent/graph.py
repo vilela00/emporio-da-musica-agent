@@ -83,9 +83,10 @@ def build_graph(checkpointer=None, llm=None):
         return {"messages": [reply]}
 
     def guard(state: State) -> dict:
-        last = state["messages"][-1]
-        evidence = [text_of(m) for m in state["messages"][:-1] if m.type in ("human", "tool")]
-        issues = ungrounded(text_of(last), evidence)
+        *earlier, last = state["messages"]
+        tools = [text_of(m) for m in earlier if m.type == "tool"]
+        said = [text_of(m) for m in earlier if m.type == "human"]
+        issues = ungrounded(text_of(last), tools, said)
         if not issues:
             return {"guard_note": None, "guard_retries": 0}
         if state.get("guard_retries", 0) < 1:

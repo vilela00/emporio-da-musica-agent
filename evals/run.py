@@ -50,15 +50,16 @@ def main() -> None:
         os.environ["EMPORIO_NOW"] = s.now
         thread = agent.thread_for(s.phone, fresh=True)
         replies, called, models, started = [], [], [], time.perf_counter()
-        evidence, leaks = [], []
+        outputs, said, leaks = [], [], []
         try:
             for message in s.turns:
                 turn = agent.reply(thread, s.phone, message)
                 replies.append(turn.text)
                 called += [name for name, _ in turn.tool_calls]
                 models += [m for m in turn.models if m not in models]
-                evidence += [message, *turn.tool_outputs]
-                leaks += ungrounded(turn.text, evidence)  # the guard should have stopped these
+                outputs += turn.tool_outputs
+                said.append(message)
+                leaks += ungrounded(turn.text, outputs, said)  # the guard should have stopped these
             failures = check(s, replies, called) + [f"not grounded: {x}" for x in leaks]
         except Exception as error:  # a crash is a failed scenario, not a crashed run
             failures = [f"error: {type(error).__name__}: {str(error)[:300]}"]
