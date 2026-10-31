@@ -70,3 +70,32 @@ def test_customer_can_hear_back_their_own_e_mail():
 def test_protocols_dates_and_zip_codes_are_not_phones():
     text = "Protocolo EM-20260403-001, CEP 79202-333, até 18/05/2026, CNPJ 12.345.678/0001-90"
     assert phones(text) == {} and emails(text) == set()
+
+
+def test_count_and_value_must_come_together():
+    tools = ["Crédito sem juros: até 4x de R$ 87,48"]
+    said = ["Dá pra fazer em 6x?"]
+    assert ungrounded("Dá sim, 6x de R$ 87,48.", tools, said) == ["6x de R$ 87,48"]
+
+
+def test_refused_plan_cannot_be_offered():
+    tools = [
+        "Crédito sem juros: até 4x de R$ 87,48",
+        "Parcelamento em 6x: não permitido. A parcela seria R$ 58,32, abaixo do mínimo de R$ 80,00 (manual §3.1).",
+    ]
+    assert ungrounded("Fica 6x de R$ 58,32.", tools) == ["6x de R$ 58,32"]
+    assert ungrounded("Em 6x não dá: a parcela seria R$ 58,32. Dá em 4x de R$ 87,48.", tools) == []
+
+
+def test_ticket_number_without_the_word_protocolo():
+    tools = ["Encaminhamento registrado: protocolo EM-20260403-001 (Reclamação)."]
+    assert ungrounded("Abri o chamado EM-20260403-007 pra você.", tools) == ["código EM-20260403-007"]
+
+
+def test_phone_after_the_word_protocolo_is_still_a_phone():
+    tools = ["| Telefone / WhatsApp | (67) 3341-4444 |", "protocolo EM-20260323-001"]
+    assert ungrounded("Guarde o protocolo e, se precisar, ligue 3341-4444.", tools) == []
+
+
+def test_paying_at_once_is_not_a_plan():
+    assert ungrounded("No débito é à vista, em 1x.", ["Débito ou boleto: R$ 599,90"]) == []
