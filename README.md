@@ -35,12 +35,15 @@ Without uv: `python -m venv .venv`, activate it, `pip install -r requirements.tx
 
 The data stops on 22/03/2026. To see the store as if it were that week, freeze the clock in `.env`: `EMPORIO_NOW=2026-03-23T10:30` (Campo Grande time). The recorded conversations do this.
 
+**Chat in the browser.** On Windows, double-click `abrir-chat.bat`; anywhere else, run `uv run python -m emporio.web`. It starts a server on this machine only and opens Tom in a chat window shaped like the support widgets stores embed on their sites: [`web/chat.html`](web/chat.html), one file with no build step and no external requests. The widget's menu picks the customer (on a real site, the login would), the store clock, and whether to show what Tom looked up. Nothing is saved: the conversation lives in memory and ends with the server.
+
 Other commands:
 
 ```bash
-uv run pytest -q                        # 100 unit tests, no LLM and no key needed
+uv run pytest -q                        # 107 unit tests, no LLM and no key needed
 uv run ruff check .
 uv run python -m evals.run              # 30 behavior scenarios against the real model -> evals/report.md
+uv run python -m emporio.web            # Tom in a browser chat window (Windows: abrir-chat.bat)
 uv run python -m evals.conversations    # re-record conversations/
 uv run python -m emporio.quality        # rebuild docs/data_quality.md from the raw CSVs
 uv run uvicorn emporio.api:app --port 8000
@@ -101,7 +104,7 @@ Each one: what I chose, why, what I turned down, and where it stops.
 
 **7. Conversation history.** SQLite checkpointer, one thread per number, the last 12 customer turns sent to the model. On WhatsApp people come back hours later ("e aí, chegou?"). Missing: retention rules and deletion on request (§9).
 
-**8. CLI first, plus an HTTP endpoint.** The CLI is the fastest way to evaluate (`--trace` prints each tool call). The FastAPI endpoint takes `{"from", "text"}`, the two fields a WhatsApp webhook delivers. Missing: Meta's webhook verification, signatures, templates and the 24-hour window.
+**8. CLI first, then an HTTP endpoint and a browser widget.** The CLI is the fastest way to evaluate (`--trace` prints each tool call). The FastAPI endpoint takes `{"from", "text"}`, the two fields a WhatsApp webhook delivers. The widget is how Tom would sit on the store's site: one HTML file a developer can drop in, talking to a server, so the key never reaches the browser. Missing: Meta's webhook verification, signatures, templates and the 24-hour window; for the site, login instead of the menu that picks the customer.
 
 **9. Raw data untouched, treatment in code.** The CSVs and the PDF are in `data/` byte for byte. Parsing and checks run at load time, and `docs/data_quality.md` is generated from the files: it lists what the agent must not repeat and doubles as a to-do list for the store.
 
@@ -146,12 +149,13 @@ The last pass was an audit of what a customer could talk the agent into, and of 
 | A conversation that burns the budget | 2,000 characters per message (no model call above that), 6 tool rounds per message, a recursion limit of 30 (LangGraph 1.2 defaults to 10,007 steps), 30 s per model call | `test_graph.py` (the real graph with a scripted model), `test_safety.py` |
 | The API key | Only in `.env`, which git ignores and no commit ever contained; the Google SDK sends it in a header, not in the URL; every error the CLI, the API log and the evaluation report print or write is redacted; a test fails if a key-shaped string shows up in any file | `test_secrets.py`, `test_safety.py` |
 | Anyone posting to the endpoint | uvicorn binds to localhost; optional bearer token (`EMPORIO_API_TOKEN`); in production, the provider's signed webhook | `test_api.py` |
+| The browser demo | Listens on 127.0.0.1 only; refuses other Host headers (DNS rebinding) and POSTs without the widget's own header (no CORS, so another site cannot send it); strict Content-Security-Policy; history only in memory | `test_web.py` |
 
 Not covered: without the token, anyone who can reach the endpoint can claim any number in `from` (on WhatsApp that field comes from the provider's signed webhook); two customers share one e-mail (A-08), so the order number + e-mail check cannot tell them apart; no rate limit per number, no cap on tickets per customer, no retention policy for the history.
 
 ## Evaluation
 
-- 100 unit tests: installment tiers, deadlines, holidays, identity scoping, search, the grounding guard, input limits, redaction, a scan for keys and invisible characters, and the agent loop with a scripted model in place of Gemini. No key needed.
+- 107 unit tests: installment tiers, deadlines, holidays, identity scoping, search, the grounding guard, input limits, redaction, a scan for keys and invisible characters, the agent loop and the browser server with a scripted model in place of Gemini. No key needed.
 - 30 behavior scenarios against the real model ([`evals/scenarios.py`](evals/scenarios.py)): one per manual clause or data trap, plus nine for attacks, questions no source answers and a customer writing in Spanish. Each checks the tools that must be called, what the reply must contain and what it must never contain, and runs the guard's grounding check on every reply. Latest run: 30/30 on `gemini-3.8-flash` (the 3.6-flash fallback answered part of two scenarios), details and every reply in [`evals/report.md`](evals/report.md).
 
 What the evaluations changed, in the order it happened (each fix is its own commit):
@@ -211,6 +215,7 @@ emporio/            domain in plain Python: catalog, pricing, shipping, orders, 
 emporio/agent/      persona and context, tools, LangGraph graph, grounding guard, runner, WhatsApp formatter
 emporio/safety.py   input cleanup, limits per message, redaction of secrets
 emporio/cli.py      terminal chat          emporio/api.py   HTTP endpoint
+web/chat.html       browser chat window    emporio/web.py   its local server (abrir-chat.bat on Windows)
 data/               the challenge files, untouched;  data/derived/ the manual in Markdown
 docs/               data quality report (generated) and traceability matrix
 evals/              behavior scenarios, runner, report, conversation recorder
