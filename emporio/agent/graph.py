@@ -1,0 +1,96 @@
+"""LangGraph wiring: agent <-> tools, and the price guard before anything reaches the customer.
+
+    START -> agent -> (tool calls?) -> tools -> agent ... -> guard -> END
+                                                   guard -> agent (once, if an amount is ungrounded)
+"""
+
+import logging
+import os
+
+from langchain.chat_models import init_chat_model
+from langchain_core.messages import AIMessage, AnyMessage, RemoveMessage, SystemMessage
+from langgraph.graph import END, START, MessagesState, StateGraph
+from langgraph.prebuilt import ToolNode
+from langgraph.runtime import Runtime
+
+from emporio import clock
+from emporio.agent.guard import FALLBACK, retry_note, ungrounded_amounts
+from emporio.agent.prompts import Session, system_prompt
+from emporio.agent.tools import TOOLS
+from emporio.catalog import get_store
+
+log = logging.getLogger("emporio.guard")
+
+DEFAULT_MODEL = "google_genai:gemini-3.8-flash"
+HISTORY_TURNS = 12
+
+
+class State(MessagesState):
+    guard_note: str | None
+    guard_retries: int
+
+
+def text_of(message: AnyMessage) -> str:
+    text = message.text  # property in langchain-core 1.x, method in 0.3
+    return text() if callable(text) else text
+
+
+def recent(messages: list[AnyMessage]) -> list[AnyMessage]:
+    """The last HISTORY_TURNS customer turns, cut at a human message so no tool result loses its call."""
+    starts = [i for i, m in enumerate(messages) if m.type == "human"]
+    return messages[starts[-HISTORY_TURNS] :] if len(starts) > HISTORY_TURNS else messages
+
+
+def make_llm():
+    model = os.getenv("LLM_MODEL", DEFAULT_MODEL)
+    options = {}
+    if model.startswith("google_genai:"):
+        # Gemini 3: keep the default temperature (1.0); lower values are known to cause loops.
+        options["thinking_level"] = os.getenv("LLM_THINKING", "low")
+    return init_chat_model(model, **options).bind_tools(TOOLS)
+
+
+def build_graph(checkpointer=None, llm=None):
+    llm = llm or make_llm()
+
+    def agent(state: State, runtime: Runtime[Session]) -> dict:
+        session = runtime.context or Session()
+        system = system_prompt(get_store(), session, clock.now(), state.get("guard_note"))
+        reply = llm.invoke([SystemMessage(content=system), *recent(state["messages"])])
+        return {"messages": [reply]}
+
+    def guard(state: State) -> dict:
+        last = state["messages"][-1]
+        evidence = [text_of(m) for m in state["messages"][:-1] if m.type in ("human", "tool")]
+        missing = ungrounded_amounts(text_of(last), evidence)
+        if not missing:
+            return {"guard_note": None, "guard_retries": 0}
+        if state.get("guard_retries", 0) < 1:
+            log.info("ungrounded amounts %s: sending the answer back once", sorted(missing))
+            return {
+                "messages": [RemoveMessage(id=last.id)],
+                "guard_note": retry_note(missing),
+                "guard_retries": 1,
+            }
+        log.warning("ungrounded amounts %s after the retry: safe fallback", sorted(missing))
+        return {
+            "messages": [RemoveMessage(id=last.id), AIMessage(content=FALLBACK)],
+            "guard_note": None,
+            "guard_retries": 0,
+        }
+
+    def after_agent(state: State) -> str:
+        return "tools" if getattr(state["messages"][-1], "tool_calls", None) else "guard"
+
+    def after_guard(state: State) -> str:
+        return "agent" if state.get("guard_note") else END
+
+    builder = StateGraph(State, context_schema=Session)
+    builder.add_node("agent", agent)
+    builder.add_node("tools", ToolNode(TOOLS, handle_tool_errors=True))
+    builder.add_node("guard", guard)
+    builder.add_edge(START, "agent")
+    builder.add_conditional_edges("agent", after_agent, ["tools", "guard"])
+    builder.add_edge("tools", "agent")
+    builder.add_conditional_edges("guard", after_guard, ["agent", END])
+    return builder.compile(checkpointer=checkpointer)
