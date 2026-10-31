@@ -36,3 +36,8 @@ def test_order_text_has_deadlines(store):
     text = orders_text(store, lookup_orders(store, phone="(67) 99789-0123"), date(2026, 3, 23))
     assert "até 24/02/2026, encerrado" in text and "até 18/05/2026, vigente" in text
     assert Decimal("159.90") in money_mentions(text)
+
+
+def test_late_order_tells_the_model_to_register_the_complaint(store):
+    text = orders_text(store, lookup_orders(store, phone="+55 67 99654-7821"), date(2026, 4, 3))
+    assert "ATRASADO" in text and "create_handoff" in text

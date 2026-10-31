@@ -224,6 +224,11 @@ def orders_text(store: Store, lookup: Lookup, today: date) -> str:
         if order.status == "shipped" and order.estimated_delivery:
             late = " (ATRASADO: a previsão já passou)" if is_late(order, today) else ""
             lines.append(f"Previsão de entrega: {fmt_date(order.estimated_delivery)}{late}")
+            if late:
+                lines.append(
+                    "Se o cliente reclamar do atraso: registre já com create_handoff (motivo reclamacao) "
+                    "e informe o protocolo que a ferramenta devolver."
+                )
         windows = deadlines(order)
         if windows:
             def state(until: date) -> str:

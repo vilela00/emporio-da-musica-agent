@@ -27,3 +27,19 @@ def test_customer_question_grounds_the_plan_being_refused():
 def test_mentions_and_note():
     assert installment_mentions("12x, 6 x ou 10 vezes; 7 dias") == {12, 6, 10}
     assert "10x" in retry_note(["10x"])
+
+
+def test_invented_protocol_is_caught():
+    # Full evaluation run: the lite model wrote "O protocolo é o #2026040301" without opening a ticket.
+    evidence = ["Pedido #8 ... Rastreio: BRJL5544332BR (site dos Correios ou da Jadlog)"]
+    answer = "Seu rastreio é BRJL5544332BR. Já abri um chamado: o protocolo é o #2026040301."
+    assert ungrounded(answer, evidence) == ["código 2026040301"]
+
+
+def test_protocol_from_the_tool_passes():
+    evidence = ["Encaminhamento registrado: protocolo EM-20260403-001 (Reclamação)."]
+    assert ungrounded("Registrei sua reclamação, protocolo *EM-20260403-001*.", evidence) == []
+
+
+def test_invented_tracking_code_is_caught():
+    assert ungrounded("Rastreio: BRXX1234567BR", ["Pedido sem rastreio"]) == ["código BRXX1234567BR"]
