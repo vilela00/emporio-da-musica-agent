@@ -134,10 +134,16 @@ def main() -> None:
         os.environ["EMPORIO_NOW"] = script.now
         thread = agent.thread_for(script.phone, fresh=True)
         exchanges, models = [], []
-        for message in script.turns:
-            turn = agent.reply(thread, script.phone, message)
-            exchanges.append((message, turn))
-            models += [m for m in turn.models if m not in models]
+        try:
+            for message in script.turns:
+                turn = agent.reply(thread, script.phone, message)
+                exchanges.append((message, turn))
+                models += [m for m in turn.models if m not in models]
+        except Exception as error:  # keep the previous recording instead of writing half a conversation
+            from emporio.agent.runner import model_failure
+
+            print(f"skipped {script.number:02d}-{script.slug}: {model_failure(error)}")
+            continue
         path = OUT / f"{script.number:02d}-{script.slug}.md"
         path.write_text(render(script, ", ".join(models) or "unknown", exchanges), encoding="utf-8")
         print(f"wrote {path.name} ({len(exchanges)} turns, {', '.join(models)})")

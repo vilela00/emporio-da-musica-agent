@@ -32,7 +32,7 @@ def main() -> None:
         logging.basicConfig(level=logging.INFO, format="  [%(name)s] %(message)s")
         logging.getLogger("httpx").setLevel(logging.WARNING)
 
-    from emporio.agent.runner import Agent  # imported after .env is loaded
+    from emporio.agent.runner import Agent, model_failure  # imported after .env is loaded
     from emporio.catalog import get_store
 
     agent = Agent()
@@ -55,7 +55,13 @@ def main() -> None:
             thread = agent.thread_for(args.phone, fresh=True)
             print("(nova conversa)\n")
             continue
-        turn = agent.reply(thread, args.phone, text)
+        try:
+            turn = agent.reply(thread, args.phone, text)
+        except Exception as error:  # every model in the chain failed
+            print(f"\n[sem resposta: {model_failure(error)}. Tente de novo mais tarde ou troque LLM_MODEL no .env]\n")
+            if args.trace:
+                print(f"  [{type(error).__name__}] {str(error)[:300]}")
+            continue
         if args.trace:
             for name, call_args in turn.tool_calls:
                 print(f"  -> {name}({_short(call_args)})")

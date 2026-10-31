@@ -22,9 +22,12 @@ from emporio.catalog import get_store
 log = logging.getLogger("emporio.guard")
 
 DEFAULT_MODEL = "google_genai:gemini-3.8-flash"
-# Other free-tier models, tried in order when the primary answers 503 "high demand" (it happened on
-# the first evaluation run). Override with LLM_FALLBACK_MODELS; leave it empty to disable.
-DEFAULT_FALLBACKS = "google_genai:gemini-3.6-flash,google_genai:gemini-3.5-flash-lite"
+# Other free-tier models, tried in order when the primary fails: 503 "high demand" on the first
+# evaluation run, then 429 when its free daily quota (20 requests per model, Oct 2026) ran out.
+# Override with LLM_FALLBACK_MODELS; leave it empty to disable.
+DEFAULT_FALLBACKS = (
+    "google_genai:gemini-3.6-flash,google_genai:gemini-3.5-flash-lite,google_genai:gemini-3.1-flash-lite"
+)
 HISTORY_TURNS = 12
 
 

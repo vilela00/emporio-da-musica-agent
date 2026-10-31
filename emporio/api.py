@@ -9,7 +9,7 @@ the unwrapping of Meta's payload; the agent only needs the two fields below.
 from functools import lru_cache
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 load_dotenv()
@@ -44,6 +44,11 @@ def health() -> dict[str, str]:
 
 @app.post("/whatsapp/messages", response_model=OutgoingMessage)
 def receive(message: IncomingMessage) -> OutgoingMessage:
+    from emporio.agent.runner import model_failure
+
     bot = agent()
-    turn = bot.reply(bot.thread_for(message.sender), message.sender, message.text)
+    try:
+        turn = bot.reply(bot.thread_for(message.sender), message.sender, message.text)
+    except Exception as error:  # every model in the chain failed
+        raise HTTPException(status_code=503, detail=model_failure(error)) from error
     return OutgoingMessage(to=message.sender, text=turn.text, tools_used=[name for name, _ in turn.tool_calls])

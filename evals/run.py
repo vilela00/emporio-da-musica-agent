@@ -40,8 +40,11 @@ def main() -> None:
     from emporio.agent.runner import Agent
 
     agent = Agent(db_path=Path("var") / "evals.sqlite")
-    rows, details = [], []
+    rows, details, quota_errors = [], [], 0
     for index, s in enumerate(chosen):
+        if quota_errors >= 2:
+            print(f"{s.id} skip  free daily quota is over; stopping here")
+            continue
         if index:
             time.sleep(args.delay)
         os.environ["EMPORIO_NOW"] = s.now
@@ -58,7 +61,8 @@ def main() -> None:
                 leaks += ungrounded(turn.text, evidence)  # the guard should have stopped these
             failures = check(s, replies, called) + [f"not grounded: {x}" for x in leaks]
         except Exception as error:  # a crash is a failed scenario, not a crashed run
-            failures = [f"error: {type(error).__name__}: {error}"]
+            failures = [f"error: {type(error).__name__}: {str(error)[:300]}"]
+            quota_errors += "RESOURCE_EXHAUSTED" in str(error)
         seconds = time.perf_counter() - started
         status = "pass" if not failures else "FAIL"
         print(f"{s.id} {status:4} {seconds:5.1f}s  {s.title}" + (f"  -> {'; '.join(failures)}" if failures else ""))
