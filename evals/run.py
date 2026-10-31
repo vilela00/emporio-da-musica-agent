@@ -45,19 +45,23 @@ def main() -> None:
             time.sleep(args.delay)
         os.environ["EMPORIO_NOW"] = s.now
         thread = agent.thread_for(s.phone, fresh=True)
-        replies, called, started = [], [], time.perf_counter()
+        replies, called, models, started = [], [], [], time.perf_counter()
         try:
             for message in s.turns:
                 turn = agent.reply(thread, s.phone, message)
                 replies.append(turn.text)
                 called += [name for name, _ in turn.tool_calls]
+                models += [m for m in turn.models if m not in models]
             failures = check(s, replies, called)
         except Exception as error:  # a crash is a failed scenario, not a crashed run
             failures = [f"error: {type(error).__name__}: {error}"]
         seconds = time.perf_counter() - started
         status = "pass" if not failures else "FAIL"
         print(f"{s.id} {status:4} {seconds:5.1f}s  {s.title}" + (f"  -> {'; '.join(failures)}" if failures else ""))
-        rows.append(f"| {s.id} | {s.title} | {s.covers} | {', '.join(dict.fromkeys(called)) or '-'} | {status} |")
+        rows.append(
+            f"| {s.id} | {s.title} | {s.covers} | {', '.join(dict.fromkeys(called)) or '-'} "
+            f"| {', '.join(models) or '-'} | {status} |"
+        )
         conversation = "\n\n".join(f"**Customer:** {m}\n\n**Tom:** {r}" for m, r in zip(s.turns, replies))
         notes = "".join(f"\n- {f}" for f in failures)
         details.append(f"### {s.id} {s.title} ({status}, {seconds:.1f}s)\n{notes}\n\n{conversation}\n")
@@ -69,8 +73,8 @@ def main() -> None:
         f"Model `{model}`, run on {datetime.now():%Y-%m-%d %H:%M}. "
         f"**{passed}/{len(rows)} scenarios passed.** Scenarios and checks: `evals/scenarios.py`.",
         "",
-        "| ID | Scenario | Covers | Tools called | Result |",
-        "|---|---|---|---|---|",
+        "| ID | Scenario | Covers | Tools called | Model | Result |",
+        "|---|---|---|---|---|---|",
     ]
     REPORT.write_text("\n".join(header + rows + ["", "## Replies", ""] + details), encoding="utf-8")
     print(f"\n{passed}/{len(rows)} passed. Report: {REPORT}")

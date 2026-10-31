@@ -22,6 +22,9 @@ from emporio.catalog import get_store
 log = logging.getLogger("emporio.guard")
 
 DEFAULT_MODEL = "google_genai:gemini-3.8-flash"
+# Other free-tier models, tried in order when the primary answers 503 "high demand" (it happened on
+# the first evaluation run). Override with LLM_FALLBACK_MODELS; leave it empty to disable.
+DEFAULT_FALLBACKS = "google_genai:gemini-3.6-flash,google_genai:gemini-3.5-flash-lite"
 HISTORY_TURNS = 12
 
 
@@ -41,13 +44,23 @@ def recent(messages: list[AnyMessage]) -> list[AnyMessage]:
     return messages[starts[-HISTORY_TURNS] :] if len(starts) > HISTORY_TURNS else messages
 
 
-def make_llm():
-    model = os.getenv("LLM_MODEL", DEFAULT_MODEL)
-    options = {}
-    if model.startswith("google_genai:"):
+def chat_model(name: str, retries: int):
+    options: dict = {"max_retries": retries}
+    if name.startswith("google_genai:"):
         # Gemini 3: keep the default temperature (1.0); lower values are known to cause loops.
         options["thinking_level"] = os.getenv("LLM_THINKING", "low")
-    return init_chat_model(model, **options).bind_tools(TOOLS)
+    return init_chat_model(name, **options).bind_tools(TOOLS)
+
+
+def make_llm():
+    primary = os.getenv("LLM_MODEL", DEFAULT_MODEL)
+    fallbacks = [
+        name.strip()
+        for name in os.getenv("LLM_FALLBACK_MODELS", DEFAULT_FALLBACKS).split(",")
+        if name.strip() and name.strip() != primary
+    ]
+    llm = chat_model(primary, retries=1 if fallbacks else 3)
+    return llm.with_fallbacks([chat_model(name, retries=2) for name in fallbacks]) if fallbacks else llm
 
 
 def build_graph(checkpointer=None, llm=None):

@@ -18,6 +18,7 @@ class Turn:
     text: str
     tool_calls: list[tuple[str, dict]] = field(default_factory=list)
     tool_outputs: list[str] = field(default_factory=list)
+    models: list[str] = field(default_factory=list)  # which model(s) answered, fallbacks included
 
 
 class Agent:
@@ -46,6 +47,9 @@ class Agent:
         for message in messages[start + 1 :]:
             if message.type == "ai":
                 turn.tool_calls += [(c["name"], c["args"]) for c in message.tool_calls or []]
+                model = (message.response_metadata or {}).get("model_name")
+                if model and model not in turn.models:
+                    turn.models.append(model)
             elif message.type == "tool":
                 turn.tool_outputs.append(text_of(message))
         return turn
