@@ -34,8 +34,7 @@ class State(MessagesState):
 
 
 def text_of(message: AnyMessage) -> str:
-    text = message.text  # property in langchain-core 1.x, method in 0.3
-    return text() if callable(text) else text
+    return str(message.text)  # Gemini 3 returns content blocks; .text joins the text parts
 
 
 def recent(messages: list[AnyMessage]) -> list[AnyMessage]:
@@ -45,7 +44,9 @@ def recent(messages: list[AnyMessage]) -> list[AnyMessage]:
 
 
 def chat_model(name: str, retries: int):
-    options: dict = {"max_retries": retries}
+    # max_retries=1 means a single attempt in the Google SDK. Without a timeout, a request to an
+    # overloaded model hung for minutes (491 s in one evaluation run) before the fallback kicked in.
+    options: dict = {"max_retries": retries, "timeout": float(os.getenv("LLM_TIMEOUT", "30"))}
     if name.startswith("google_genai:"):
         # Gemini 3: keep the default temperature (1.0); lower values are known to cause loops.
         options["thinking_level"] = os.getenv("LLM_THINKING", "low")
