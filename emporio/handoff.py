@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +17,9 @@ REASONS = {
     "dados_pessoais": "Dados pessoais (LGPD)",
     "outro": "Outro",
 }
+
+
+_NUMBERING = threading.Lock()  # protocol numbers are read-then-append: one writer at a time
 
 
 @dataclass(frozen=True)
@@ -42,17 +46,18 @@ def open_ticket(
     var_dir.mkdir(parents=True, exist_ok=True)
     path = var_dir / "handoffs.jsonl"
     prefix = f"EM-{at:%Y%m%d}-"
-    existing = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
-    sequence = 1 + sum(json.loads(line)["protocol"].startswith(prefix) for line in existing if line)
-    ticket = Ticket(
-        protocol=f"{prefix}{sequence:03d}",
-        created_at=at.isoformat(timespec="minutes"),
-        reason=reason if reason in REASONS else "outro",
-        summary=summary.strip(),
-        phone=phone,
-        customer=customer,
-        orders=orders,
-    )
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(asdict(ticket), ensure_ascii=False) + "\n")
+    with _NUMBERING:
+        existing = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+        sequence = 1 + sum(json.loads(line)["protocol"].startswith(prefix) for line in existing if line)
+        ticket = Ticket(
+            protocol=f"{prefix}{sequence:03d}",
+            created_at=at.isoformat(timespec="minutes"),
+            reason=reason if reason in REASONS else "outro",
+            summary=summary.strip(),
+            phone=phone,
+            customer=customer,
+            orders=orders,
+        )
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(asdict(ticket), ensure_ascii=False) + "\n")
     return ticket

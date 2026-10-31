@@ -4,8 +4,10 @@ No `from __future__ import annotations` here on purpose: LangChain reads these s
 to build the schemas and to hide the injected `runtime` argument from the model.
 """
 
+import os
 from collections import Counter
 from decimal import Decimal
+from pathlib import Path
 from typing import Literal
 
 from langchain.tools import ToolRuntime, tool
@@ -182,7 +184,7 @@ def create_handoff(runtime: ToolRuntime[Session], reason: HandoffReason, summary
     customer = store.customer_by_phone(phone)
     now = clock.now()
     ticket = open_ticket(
-        ROOT / "var",
+        Path(os.getenv("EMPORIO_VAR_DIR") or ROOT / "var"),
         at=now,
         reason=reason,
         summary=summary[:MAX_SUMMARY_CHARS],

@@ -129,6 +129,9 @@ def main() -> None:
 
     from emporio.agent.runner import Agent
 
+    # tickets opened in the recordings get their own file, numbered from 001 on every recording
+    os.environ["EMPORIO_VAR_DIR"] = str(Path("var") / "recordings")
+    (Path("var") / "recordings" / "handoffs.jsonl").unlink(missing_ok=True)
     agent = Agent(db_path=Path("var") / "conversations-recording.sqlite")
     OUT.mkdir(exist_ok=True)
     for script in chosen:

@@ -14,6 +14,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from emporio.agent import DEFAULT_MODEL
 from emporio.agent.guard import ungrounded
 from emporio.safety import redact
 from evals.scenarios import SCENARIOS, Scenario
@@ -40,6 +41,9 @@ def main() -> None:
 
     from emporio.agent.runner import Agent
 
+    # tickets opened by this run go to their own file, numbered from 001, not to the store's var/handoffs.jsonl
+    os.environ["EMPORIO_VAR_DIR"] = str(Path("var") / "evals")
+    (Path("var") / "evals" / "handoffs.jsonl").unlink(missing_ok=True)
     agent = Agent(db_path=Path("var") / "evals.sqlite")
     rows, details, quota_errors = [], [], 0
     for index, s in enumerate(chosen):
@@ -76,7 +80,7 @@ def main() -> None:
         notes = "".join(f"\n- {f}" for f in failures)
         details.append(f"### {s.id} {s.title} ({status}, {seconds:.1f}s)\n{notes}\n\n{conversation}\n")
     passed = sum(row.endswith("| pass |") for row in rows)
-    model = os.getenv("LLM_MODEL", "google_genai:gemini-3.8-flash")
+    model = os.getenv("LLM_MODEL", DEFAULT_MODEL)
     header = [
         "# Evaluation report",
         "",

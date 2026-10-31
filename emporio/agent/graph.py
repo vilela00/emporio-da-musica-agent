@@ -16,6 +16,7 @@ from langgraph.prebuilt import ToolNode
 from langgraph.runtime import Runtime
 
 from emporio import clock
+from emporio.agent import DEFAULT_MODEL
 from emporio.agent.guard import FALLBACK, retry_note, ungrounded
 from emporio.agent.prompts import Session, system_prompt
 from emporio.agent.tools import TOOLS
@@ -24,7 +25,6 @@ from emporio.safety import MAX_TOOL_ROUNDS, STUCK, tool_rounds
 
 log = logging.getLogger("emporio.guard")
 
-DEFAULT_MODEL = "google_genai:gemini-3.8-flash"
 # Other free-tier models, tried in order when the primary fails: 503 "high demand" on the first
 # evaluation run, then 429 when its free daily quota (20 requests per model, Oct 2026) ran out.
 # Override with LLM_FALLBACK_MODELS; leave it empty to disable.

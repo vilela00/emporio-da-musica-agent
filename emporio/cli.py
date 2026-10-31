@@ -10,6 +10,7 @@ import sys
 
 from dotenv import load_dotenv
 
+from emporio.agent import DEFAULT_MODEL
 from emporio.safety import protect_logs, redact
 
 
@@ -23,10 +24,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Chat with Tom, the Empório da Música assistant.")
     parser.add_argument("--phone", help="the customer's WhatsApp number; it identifies the customer")
     parser.add_argument("--new", action="store_true", help="start a fresh conversation for this number")
-    parser.add_argument("--trace", action="store_true", help="show tool calls and price-guard decisions")
+    parser.add_argument("--trace", action="store_true", help="show tool calls and grounding-guard decisions")
     args = parser.parse_args()
 
-    model = os.getenv("LLM_MODEL", "google_genai:gemini-3.8-flash")
+    model = os.getenv("LLM_MODEL", DEFAULT_MODEL)
     if model.startswith("google_genai:") and not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")):
         sys.exit("GOOGLE_API_KEY is not set. Copy .env.example to .env and paste a free key from "
                  "https://aistudio.google.com/apikey")
