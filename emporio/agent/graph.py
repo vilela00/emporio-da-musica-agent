@@ -1,7 +1,9 @@
-"""LangGraph wiring: agent <-> tools, and the price guard before anything reaches the customer.
+"""LangGraph wiring: agent <-> tools, and the grounding guard before anything reaches the customer.
 
     START -> agent -> (tool calls?) -> tools -> agent ... -> guard -> END
-                                                   guard -> agent (once, if an amount is ungrounded)
+                                                   guard -> agent (once, if something is ungrounded)
+
+The agent stops asking the model after MAX_TOOL_ROUNDS tool rounds for one message (emporio.safety).
 """
 
 import logging
@@ -18,6 +20,7 @@ from emporio.agent.guard import FALLBACK, retry_note, ungrounded
 from emporio.agent.prompts import Session, system_prompt
 from emporio.agent.tools import TOOLS
 from emporio.catalog import get_store
+from emporio.safety import MAX_TOOL_ROUNDS, STUCK, tool_rounds
 
 log = logging.getLogger("emporio.guard")
 
@@ -71,6 +74,9 @@ def build_graph(checkpointer=None, llm=None):
     llm = llm or make_llm()
 
     def agent(state: State, runtime: Runtime[Session]) -> dict:
+        if tool_rounds(state["messages"]) >= MAX_TOOL_ROUNDS:
+            log.warning("%d tool rounds for one message: stopping", MAX_TOOL_ROUNDS)
+            return {"messages": [AIMessage(content=STUCK)]}
         session = runtime.context or Session()
         system = system_prompt(get_store(), session, clock.now(), state.get("guard_note"))
         reply = llm.invoke([SystemMessage(content=system), *recent(state["messages"])])

@@ -1,0 +1,22 @@
+from types import SimpleNamespace
+
+from emporio.safety import MAX_TOOL_ROUNDS, RECURSION_LIMIT, tool_rounds
+
+
+def message(kind: str, tool_calls=None):
+    return SimpleNamespace(type=kind, tool_calls=tool_calls or [])
+
+
+def test_tool_rounds_count_only_the_current_message():
+    history = [
+        message("human"), message("ai", [{"name": "search_products"}]), message("tool"), message("ai"),
+        message("human"), message("ai", [{"name": "quote"}]), message("tool"),
+        message("ai", [{"name": "quote"}]), message("tool"),
+    ]
+    assert tool_rounds(history) == 2
+    assert tool_rounds(history[:5]) == 0
+
+
+def test_round_cap_fits_in_the_recursion_limit():
+    # each round is two graph steps (agent, tools), plus the answer, the guard and one retry
+    assert 2 * MAX_TOOL_ROUNDS + 4 <= RECURSION_LIMIT

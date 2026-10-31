@@ -12,6 +12,7 @@ from emporio.agent.graph import build_graph, text_of
 from emporio.agent.prompts import Session
 from emporio.agent.whatsapp import whatsapp_text
 from emporio.catalog import ROOT, phone_digits
+from emporio.safety import RECURSION_LIMIT
 
 
 def model_failure(error: Exception) -> str:
@@ -54,7 +55,7 @@ class Agent:
     def reply(self, thread_id: str, phone: str | None, text: str) -> Turn:
         state = self.graph.invoke(
             {"messages": [HumanMessage(content=text)]},
-            config={"configurable": {"thread_id": thread_id}},
+            config={"configurable": {"thread_id": thread_id}, "recursion_limit": RECURSION_LIMIT},
             context=Session(phone=phone),
         )
         messages = state["messages"]
