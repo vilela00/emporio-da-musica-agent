@@ -37,6 +37,7 @@ def test_saturday_afternoon_skips_sunday_and_finados():
     assert not status.is_open
     assert status.next_opening == at("2026-11-03T09:00")
     assert "terça-feira, 03/11/2026, às 09:00" in describe(status)
+    assert "segunda-feira, 02/11/2026 (Finados)" in describe(status)
 
 
 def test_saturday_closes_at_one():

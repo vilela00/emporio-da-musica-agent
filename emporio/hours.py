@@ -101,7 +101,17 @@ def describe(status: StoreStatus) -> str:
     if status.is_open:
         return f"{head} A loja está aberta e fecha hoje às {status.closes_at:%H:%M}."
     reopen = status.next_opening
-    return (
-        f"{head} A loja está fechada ({status.closed_reason}). A equipe volta na "
+    article = "no" if reopen.weekday() >= 5 else "na"  # no sábado, na segunda-feira
+    text = (
+        f"{head} A loja está fechada ({status.closed_reason}). A equipe volta {article} "
         f"{WEEKDAYS[reopen.weekday()]}, {fmt_date(reopen)}, às {reopen:%H:%M}."
     )
+    skipped = []  # holidays between today and the reopening, so the customer knows why it takes longer
+    for offset in range(1, (reopen.date() - status.at.date()).days):
+        day = status.at.date() + timedelta(days=offset)
+        name = holiday_name(day)
+        if name:
+            skipped.append(f"{WEEKDAYS[day.weekday()]}, {fmt_date(day)} ({name})")
+    if skipped:
+        text += f" Antes disso não abre por feriado: {'; '.join(skipped)}."
+    return text
